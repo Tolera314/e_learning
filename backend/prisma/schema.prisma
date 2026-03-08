@@ -1,0 +1,530 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum AcademicSegment {
+  KG_G5
+  G6_G12
+  UNIVERSITY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentMethod {
+  TELEBIRR
+  CBE_BIRR
+  CHAPA
+  MANUAL
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id              String    @id @default(uuid())
+  name            String
+  email           String?   @unique
+  phoneNumber     String    @unique @map("phone_number")
+  passwordHash    String    @map("password_hash")
+  avatar          String?
+  role            UserRole  @default(STUDENT)
+  isVerified      Boolean   @default(false) @map("is_verified")
+  onboardingCompleted Boolean @default(false) @map("onboarding_completed")
+  verificationCode String?   @map("verification_code")
+  verificationExpires DateTime? @map("verification_expires")
+  trialUsed       Boolean   @default(false) @map("trial_used")
+  refreshToken    String?   @map("refresh_token")        // hashed
+  refreshTokenExpires DateTime? @map("refresh_token_expires")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  // Relations
+  studentProfile      StudentProfile?
+  instructorProfile   InstructorProfile?
+  subscriptions   Subscription[]
+  transactions    Transaction[]
+  courses         Course[]
+  enrollments     Enrollment[]
+  lessonProgress  LessonProgress[]
+  quizSubmissions QuizSubmission[]
+  certificates    Certificate[]
+  liveAttendance  LiveSessionAttendance[]
+  readingAnnotations ReadingAnnotation[]
+  readingComments ReadingComment[]
+  activityLogs    StudentActivityLog[]
+  sentChatMessages LiveSessionChatLog[]
+  videoMetrics    VideoStreamMetric[]
+
+  @@map("users")
+}
+
+model StudentProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique @map("user_id")
+  user              User      @relation(fields: [userId], references: [id])
+  
+  gender            String?
+  dob               DateTime?
+  region            String?
+  
+  educationLevel    AcademicSegment? @map("education_level")
+  currentGrade      String? @map("current_grade")
+  universityName    String? @map("university_name")
+  fieldOfStudy      String? @map("field_of_study")
+  yearOfStudy       Int? @map("year_of_study")
+  
+  subjectsOfInterest String[] @map("subjects_of_interest")
+  
+  parentName        String? @map("parent_name")
+  parentPhone       String? @map("parent_phone")
+  
+  @@map("student_profiles")
+}
+
+model InstructorProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique @map("user_id")
+  user              User      @relation(fields: [userId], references: [id])
+  
+  gender            String?
+  country           String? @default("Ethiopia")
+  
+  highestEducation  String? @map("highest_education")
+  teachingExperience Int?   @map("teaching_experience")
+  bio               String? @db.Text
+  
+  degreeUrl         String? @map("degree_url")
+  idUrl             String? @map("id_url")
+  
+  subjects          String[] @map("subjects")
+  liveAvailability  Boolean  @default(false) @map("live_availability")
+  languagePreference String? @map("language_preference")
+  
+  isApproved        Boolean  @default(false) @map("is_approved")
+  
+  @@map("instructor_profiles")
+}
+
+model Subscription {
+  id            String          @id @default(uuid())
+  studentId     String          @map("student_id")
+  segmentAccess AcademicSegment @map("segment_access")
+  startsAt      DateTime        @map("starts_at")
+  expiresAt     DateTime        @map("expires_at")
+  isTrial       Boolean         @default(false) @map("is_trial")
+  
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  student       User            @relation(fields: [studentId], references: [id])
+
+  @@map("subscriptions")
+  @@index([studentId])
+  @@index([studentId, expiresAt])  // Added: efficient active subscription lookups
+}
+
+model Transaction {
+  id            String        @id @default(uuid())
+  userId        String        @map("user_id")
+  amount        Decimal
+  currency      String        @default("ETB")
+  paymentMethod PaymentMethod @map("payment_method")
+  referenceCode String        @unique @map("reference_code")
+  status        PaymentStatus @default(PENDING)
+  
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@map("transactions")
+  @@index([userId])
+}
+
+model Course {
+  id               String          @id @default(uuid())
+  instructorId     String          @map("instructor_id")
+  title            String
+  shortDescription String          @map("short_description")
+  fullDescription  String?         @db.Text @map("full_description")
+  
+  category         String
+  subcategory      String?
+  level            String          @default("Beginner")
+  language         String          @default("English")
+  
+  objectives       String[]        @default([])
+  requirements     String[]        @default([])
+  targetAudience   String[]        @map("target_audience") @default([])
+  
+  thumbnailUrl     String?         @map("thumbnail_url")
+  price            Decimal         @default(0.0)
+  discountPrice    Decimal?        @map("discount_price")
+  isFree           Boolean         @default(true) @map("is_free")
+  
+  visibility       CourseStatus    @default(DRAFT)
+  allowDiscussions Boolean         @default(true) @map("allow_discussions")
+  allowReviews     Boolean         @default(true) @map("allow_reviews")
+  issueCertificate Boolean         @default(true) @map("issue_certificate")
+  
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  deletedAt        DateTime?       @map("deleted_at")
+
+  // Relations
+  instructor       User            @relation(fields: [instructorId], references: [id])
+  modules          Module[]
+  resources        Resource[]
+  enrollments      Enrollment[]
+  certificates     Certificate[]
+  exams            ExamTest[]
+  activityLogs     StudentActivityLog[]
+
+  @@map("courses")
+  @@index([instructorId])
+  @@index([visibility, deletedAt])  // Added: for public course listing query
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  courseId    String   @map("course_id")
+  title       String
+  orderIndex  Int      @map("order_index")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  course      Course   @relation(fields: [courseId], references: [id])
+  lessons     Lesson[]
+
+  @@map("modules")
+  @@index([courseId])
+}
+
+model Lesson {
+  id              String    @id @default(uuid())
+  moduleId        String    @map("module_id")
+  title           String
+  type            String    @default("VIDEO") // VIDEO, TEXT, QUIZ, ASSIGNMENT
+  videoUrl        String?   @map("video_url")
+  durationSeconds Int?      @map("duration_seconds")
+  content         String?   @db.Text
+  orderIndex      Int       @map("order_index")
+  isFreePreview   Boolean   @default(false) @map("is_free_preview")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  module          Module          @relation(fields: [moduleId], references: [id])
+  resources       Resource[]
+  progress        LessonProgress[]
+  quizzes         Quiz[]
+  liveSession     LiveSession?
+  videoMetrics    VideoStreamMetric[]
+
+  @@map("lessons")
+  @@index([moduleId])
+}
+
+model Resource {
+  id        String   @id @default(uuid())
+  lessonId  String?  @map("lesson_id")
+  courseId  String   @map("course_id")
+  title     String
+  fileUrl   String   @map("file_url")
+  isCollaborative Boolean @default(false) @map("is_collaborative")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+  annotations ReadingAnnotation[]
+  comments    ReadingComment[]
+
+  @@map("resources")
+  @@index([courseId])
+}
+
+model Enrollment {
+  id              String   @id @default(uuid())
+  studentId       String   @map("student_id")
+  courseId        String   @map("course_id")
+  progressPercent Decimal  @default(0.0) @map("progress_percent")
+  isCompleted     Boolean  @default(false) @map("is_completed")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  student         User     @relation(fields: [studentId], references: [id])
+  course          Course   @relation(fields: [courseId], references: [id])
+
+  @@map("enrollments")
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])          // Added: needed for course-wide analytics
+}
+
+model LessonProgress {
+  studentId          String   @map("student_id")
+  lessonId           String   @map("lesson_id")
+  isCompleted        Boolean  @default(false) @map("is_completed")
+  watchTimeSeconds   Int      @default(0) @map("watch_time_seconds")
+  
+  // Relations
+  student            User     @relation(fields: [studentId], references: [id])
+  lesson             Lesson   @relation(fields: [lessonId], references: [id])
+
+  @@id([studentId, lessonId])
+  @@map("lesson_progress")
+  @@index([lessonId])          // Added: for lesson-level completion analytics
+}
+
+model Quiz {
+  id           String   @id @default(uuid())
+  lessonId     String   @map("lesson_id")
+  title        String
+  passingScore Int      @map("passing_score")
+  durationMinutes Int?  @map("duration_minutes")
+  
+  // Relations
+  lesson       Lesson   @relation(fields: [lessonId], references: [id])
+  questions    Question[]
+  submissions  QuizSubmission[]
+
+  @@map("quizzes")
+  @@index([lessonId])
+}
+
+model QuizSubmission {
+  id        String   @id @default(uuid())
+  studentId String   @map("student_id")
+  quizId    String   @map("quiz_id")
+  score     Int
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  student   User     @relation(fields: [studentId], references: [id])
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  answers   QuizAnswer[]
+
+  @@map("quiz_submissions")
+  @@index([studentId])
+  @@index([quizId])            // Added: for instructor quiz analytics
+}
+
+model Certificate {
+  id               String   @id @default(uuid())
+  studentId        String   @map("student_id")
+  courseId         String   @map("course_id")
+  verificationCode String   @unique @map("verification_code")
+  pdfUrl           String   @map("pdf_url")
+  
+  issuedAt         DateTime @default(now()) @map("issued_at")
+
+  // Relations
+  student          User     @relation(fields: [studentId], references: [id])
+  course           Course   @relation(fields: [courseId], references: [id])
+
+  @@map("certificates")
+  @@index([studentId])
+}
+
+model LiveSession {
+  id              String   @id @default(uuid())
+  lessonId        String   @unique @map("lesson_id")
+  startTime       DateTime @map("start_time")
+  endTime         DateTime? @map("end_time")
+  meetingUrl      String?  @map("meeting_url")
+  recordingUrl    String?  @map("recording_url")
+  isLive          Boolean  @default(false) @map("is_live")
+
+  lesson          Lesson   @relation(fields: [lessonId], references: [id])
+  attendance      LiveSessionAttendance[]
+  chatLogs        LiveSessionChatLog[]
+
+  @@map("live_sessions")
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  quizId      String?  @map("quiz_id")
+  examId      String?  @map("exam_id")
+  text        String
+  points      Int      @default(1)
+  
+  quiz        Quiz?     @relation(fields: [quizId], references: [id])
+  exam        ExamTest? @relation(fields: [examId], references: [id])
+  options     QuestionOption[]
+  answers     QuizAnswer[]
+
+  @@map("questions")
+}
+
+model QuestionOption {
+  id          String   @id @default(uuid())
+  questionId  String   @map("question_id")
+  text        String
+  isCorrect   Boolean  @default(false) @map("is_correct")
+  
+  question    Question @relation(fields: [questionId], references: [id])
+
+  @@map("question_options")
+}
+
+model ExamTest {
+  id          String   @id @default(uuid())
+  courseId    String   @map("course_id")
+  title       String
+  description String?
+  durationMinutes Int @map("duration_minutes")
+  
+  course      Course   @relation(fields: [courseId], references: [id])
+  questions   Question[]
+
+  @@map("exam_tests")
+}
+model LiveSessionAttendance {
+  id            String   @id @default(uuid())
+  studentId     String   @map("student_id")
+  liveSessionId String   @map("live_session_id")
+  joinedAt      DateTime @default(now()) @map("joined_at")
+  leftAt        DateTime? @map("left_at")
+
+  student       User        @relation(fields: [studentId], references: [id])
+  liveSession   LiveSession @relation(fields: [liveSessionId], references: [id])
+
+  @@map("live_session_attendance")
+}
+
+model QuizAnswer {
+  id              String   @id @default(uuid())
+  submissionId    String   @map("submission_id")
+  questionId      String   @map("question_id")
+  selectedOptionId String  @map("selected_option_id")
+  
+  submission      QuizSubmission @relation(fields: [submissionId], references: [id])
+  question        Question       @relation(fields: [questionId], references: [id])
+
+  @@map("quiz_answers")
+}
+
+model ReadingAnnotation {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  resourceId  String   @map("resource_id")
+  content     String   @db.Text
+  color       String   @default("yellow")
+  selectionRange String  @map("selection_range") // JSON string for position
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  student     User     @relation(fields: [studentId], references: [id])
+  resource    Resource @relation(fields: [resourceId], references: [id])
+
+  @@map("reading_annotations")
+}
+
+model ReadingComment {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  resourceId  String   @map("resource_id")
+  content     String   @db.Text
+  parentId    String?  @map("parent_id")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  student     User     @relation(fields: [studentId], references: [id])
+  resource    Resource @relation(fields: [resourceId], references: [id])
+  parent      ReadingComment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     ReadingComment[] @relation("CommentReplies")
+
+  @@map("reading_comments")
+}
+
+model StudentActivityLog {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  courseId    String?  @map("course_id")
+  action      String   // LOGIN, LOGOUT, WATCH_VIDEO, START_QUIZ, SUBMIT_QUIZ, JOIN_LIVE, DOWNLOAD_RESOURCE
+  metadata    String?  @db.Text // JSON string for extra data
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  student     User     @relation(fields: [studentId], references: [id])
+  course      Course?  @relation(fields: [courseId], references: [id])
+
+  @@map("student_activity_logs")
+  @@index([studentId, courseId, createdAt])  // Added: composite for timeline queries
+}
+
+model LiveSessionChatLog {
+  id            String   @id @default(uuid())
+  liveSessionId String   @map("live_session_id")
+  senderId      String   @map("sender_id")
+  message       String   @db.Text
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  liveSession   LiveSession @relation(fields: [liveSessionId], references: [id])
+  sender        User        @relation(fields: [senderId], references: [id])
+
+  @@map("live_session_chat_logs")
+  @@index([liveSessionId, createdAt])  // Added: for chat history pagination
+}
+
+model SystemPerformanceLog {
+  id          String   @id @default(uuid())
+  type        String   // ERROR, WARNING, INFO
+  source      String   // FRONTEND_PLAYER, BACKEND_API, LIVE_SERVICE
+  message     String   @db.Text
+  stackTrace  String?  @db.Text @map("stack_trace")
+  metadata    String?  @db.Text // JSON string for system environment, etc.
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("system_performance_logs")
+}
+
+model VideoStreamMetric {
+  id              String   @id @default(uuid())
+  studentId       String   @map("student_id")
+  lessonId        String   @map("lesson_id")
+  bufferingEvents Int      @default(0) @map("buffering_events")
+  averageBitrate  Int?     @map("average_bitrate")
+  playbackErrors  Int      @default(0) @map("playback_errors")
+  totalWatchTime  Int      @default(0) @map("total_watch_time")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  student         User     @relation(fields: [studentId], references: [id])
+  lesson          Lesson   @relation(fields: [lessonId], references: [id])
+
+  @@map("video_stream_metrics")
+}
