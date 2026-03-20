@@ -334,7 +334,7 @@ const StudentProgressTracker = dynamic(() => import('@/components/StudentProgres
 19. Deploy Redis for session caching and rate limiting state
 20. Use a **read replica** PostgreSQL instance for analytics queries
 21. Consider moving analytics to a dedicated **OLAP store** (ClickHouse or TimescaleDB)
-22. Horizontally scale Node.js with **PM2 cluster mode** or **Kubernetes**
+22. ~~Horizontally scale Node.js with **PM2 cluster mode**~~ ✅ DONE
 
 ---
 

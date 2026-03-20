@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-digital_learning}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - eda_network
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: always
+    environment:
+      # PgBouncer connects to the 'db' service
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-digital_learning}
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      # Critical for Prisma: must be in transaction mode
+      POOL_MODE: transaction
+    ports:
+      - "6432:5432"
+    depends_on:
+      - db
+    networks:
+      - eda_network
+
+volumes:
+  postgres_data:
+
+networks:
+  eda_network:
+    driver: bridge

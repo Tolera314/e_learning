@@ -21,9 +21,11 @@ import {
   LifeBuoy,
   Trophy,
   CreditCard,
-  UserCircle
+  UserCircle,
+  MessageSquare
 } from "lucide-react";
 import Link from "next/link";
+import NotificationBell from "./NotificationBell";
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -88,6 +90,7 @@ export default function DashboardLayout({
       { icon: <Trophy size={20} />, label: "Certificates", href: "/dashboard/student/certificates" },
       { icon: <Star size={20} />, label: "Reviews", href: "/dashboard/student/reviews" },
       { icon: <CreditCard size={20} />, label: "Subscription", href: "/dashboard/student/subscription" },
+      { icon: <MessageSquare size={20} />, label: "Messages", href: "/dashboard/student/messages" },
       { icon: <Bell size={20} />, label: "Notifications", href: "/dashboard/student/notifications" },
       { icon: <UserCircle size={20} />, label: "Profile Settings", href: "/dashboard/student/settings" },
       { icon: <LifeBuoy size={20} />, label: "Help & Support", href: "/dashboard/student/support" },
@@ -103,6 +106,7 @@ export default function DashboardLayout({
       { icon: <BarChart3 size={20} />, label: "Analytics", href: "/dashboard/instructor/analytics" },
       { icon: <Star size={20} />, label: "Reviews", href: "/dashboard/instructor/reviews" },
       { icon: <DollarSign size={20} />, label: "Earnings", href: "/dashboard/instructor/earnings" },
+      { icon: <MessageSquare size={20} />, label: "Messages", href: "/dashboard/instructor/messages" },
       { icon: <Bell size={20} />, label: "Notifications", href: "/dashboard/instructor/notifications" },
       { icon: <Settings size={20} />, label: "Profile Settings", href: "/dashboard/instructor/settings" },
       { icon: <LifeBuoy size={20} />, label: "Support", href: "/dashboard/instructor/support" },
@@ -181,6 +185,8 @@ export default function DashboardLayout({
           </button>
 
           <div className="flex items-center gap-4">
+            <NotificationBell />
+            <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
             <div className="hidden sm:block text-right">
               <p className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</p>
               <p className="text-xs text-gray-500 capitalize">{user.role}</p>

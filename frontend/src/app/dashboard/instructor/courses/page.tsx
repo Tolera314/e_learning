@@ -9,7 +9,8 @@ import {
   Edit3, 
   Users, 
   Star,
-  BookOpen
+  BookOpen,
+  MessageSquare
 } from "lucide-react";
 import Link from "next/link";
 
@@ -112,6 +113,9 @@ export default function InstructorCourses() {
                               <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="View Analytics">
                                  <BarChart2 size={18} />
                               </button>
+                              <Link href={`/dashboard/instructor/courses/${course.id}/discussions`} className="p-2 text-gray-400 hover:text-primary-600 transition-colors" title="Moderate Discussions">
+                                 <MessageSquare size={18} />
+                              </Link>
                               <button className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                                  <MoreVertical size={18} />
                               </button>

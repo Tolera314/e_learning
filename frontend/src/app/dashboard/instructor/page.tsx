@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { 
   Users, 
   BookOpen, 
@@ -11,9 +12,11 @@ import {
   ChevronRight,
   TrendingUp,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
+import api from "@/lib/api";
 
 const StatsCard = ({ icon, label, value, color, trend }: any) => (
   <motion.div 
@@ -57,6 +60,34 @@ const ActivityItem = ({ title, type, time, user }: any) => (
 );
 
 export default function InstructorDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statsRes, activityRes] = await Promise.all([
+          api.get("/instructor/dashboard/stats"),
+          api.get("/instructor/dashboard/activity")
+        ]);
+        setStats(statsRes.data);
+        setActivities(activityRes.data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 size={40} className="text-emerald-500 animate-spin" />
+    </div>
+  );
+
   return (
     <div className="max-w-7xl mx-auto pb-10">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -80,28 +111,28 @@ export default function InstructorDashboard() {
         <StatsCard 
           icon={<BookOpen className="text-blue-600" />} 
           label="Total Courses" 
-          value="14" 
+          value={stats?.totalCourses || "0"} 
           color="bg-blue-50 dark:bg-blue-900/20"
-          trend="+2 this month"
+          trend={stats?.courseTrend}
         />
         <StatsCard 
           icon={<Users className="text-emerald-600" />} 
           label="Total Students" 
-          value="3,842" 
+          value={stats?.totalStudents?.toLocaleString() || "0"} 
           color="bg-emerald-50 dark:bg-emerald-900/20"
-          trend="+12% weekly"
+          trend={stats?.studentTrend}
         />
         <StatsCard 
           icon={<DollarSign className="text-amber-600" />} 
           label="Total Revenue" 
-          value="84,250 ETB" 
+          value={`${stats?.totalRevenue || "0.00"} ETB`} 
           color="bg-amber-50 dark:bg-amber-900/20"
-          trend="+5,400 today"
+          trend={stats?.revenueTrend}
         />
         <StatsCard 
           icon={<Star className="text-purple-600" />} 
           label="Avg. Rating" 
-          value="4.9 / 5.0" 
+          value={`${stats?.avgRating || "5.0"} / 5.0`} 
           color="bg-purple-50 dark:bg-purple-900/20"
         />
       </div>
@@ -115,11 +146,21 @@ export default function InstructorDashboard() {
                  <button className="text-sm font-bold text-emerald-600 hover:dark:text-emerald-400">View All</button>
               </div>
               <div className="space-y-2">
-                 <ActivityItem user="Abebe Kebede" title="enrolled in Calculus for Grade 12" type="Enrollment" time="2 minutes ago" />
-                 <ActivityItem user="Sara Tesfaye" title="submitted Assignment 2: Partial Derivatives" type="Submission" time="15 minutes ago" />
-                 <ActivityItem user="Dawit Haile" title="left a 5-star review on Physics Fundamentals" type="Review" time="1 hour ago" />
-                 <ActivityItem user="Tigist Bekele" title="enrolled in Chemistry Grade 11" type="Enrollment" time="3 hours ago" />
-                 <ActivityItem user="Samuel Girma" title="asked a question in Lesson 4 Discussion" type="Question" time="5 hours ago" />
+                 {activities.length === 0 ? (
+                   <div className="text-center py-10 text-gray-400 text-sm italic">
+                     No recent activity found.
+                   </div>
+                 ) : (
+                   activities.map((act) => (
+                     <ActivityItem 
+                       key={act.id}
+                       user={act.user} 
+                       title={act.title} 
+                       type={act.type} 
+                       time={new Date(act.time).toLocaleDateString() === new Date().toLocaleDateString() ? "Today" : new Date(act.time).toLocaleDateString()} 
+                     />
+                   ))
+                 )}
               </div>
             </div>
 

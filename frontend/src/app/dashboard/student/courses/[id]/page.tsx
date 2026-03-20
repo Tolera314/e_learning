@@ -13,15 +13,23 @@ import {
    Menu,
    Users,
    StickyNote,
-   Send
+   Send,
+   Trophy
 } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import QuizInterface from "@/components/QuizInterface";
+import QuizPlayer from "@/components/QuizPlayer";
 import CourseVideoPlayer from "@/components/CourseVideoPlayer";
 import ReadingViewer from "@/components/ReadingViewer";
 import LearningTools from "@/components/LearningTools";
+import JitsiMeeting from "@/components/JitsiMeeting";
+import StudentAssignmentView from "@/components/StudentAssignmentView";
+import DiscussionForum from "@/components/DiscussionForum";
+import SubscriptionGuard from "@/components/SubscriptionGuard";
+import CertificateRenderer from "@/components/CertificateRenderer";
+import { useParams } from "next/navigation";
+import { toast } from "react-hot-toast";
 
 const MOCK_QUESTIONS = [
    {
@@ -60,10 +68,20 @@ const CURRICULUM = [
 ];
 
 export default function CourseLearningPage() {
+   const params = useParams();
+   const courseId = params?.id as string || "1";
    const [sidebarOpen, setSidebarOpen] = useState(true);
    const [toolsOpen, setToolsOpen] = useState(true);
    const [activeTab, setActiveTab] = useState("overview");
    const [activeLesson, setActiveLesson] = useState(CURRICULUM[1].lessons[0]);
+   const [showCertificate, setShowCertificate] = useState(false);
+   const [courseProgress, setCourseProgress] = useState(65); // Mocked for UI demo
+   const [enrollmentData, setEnrollmentData] = useState<any>(null);
+
+   // Real data fetching would happen here
+   React.useEffect(() => {
+    // api.get(`/enrollments/${courseId}`).then(...)
+   }, [courseId]);
 
    const handleProgress = (percent: number) => {
       if (percent > 90 && !activeLesson.completed) {
@@ -90,12 +108,23 @@ export default function CourseLearningPage() {
                      </Link>
                      <h2 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-2">Advanced Calculus for G12</h2>
                      <div className="mt-4 flex items-center justify-between text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
-                        <span>65% Completed</span>
-                        <span>14 / 28 Lessons</span>
+                        <span>{courseProgress}% Completed</span>
+                        <span>{Math.round(courseProgress / 100 * 24)} / 24 Lessons</span>
                      </div>
                      <div className="mt-2 h-1.5 bg-gray-50 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-600 w-[65%]" />
+                        <div className="h-full bg-emerald-600 transition-all duration-1000" style={{ width: `${courseProgress}%` }} />
                      </div>
+                     {courseProgress === 100 && (
+                        <motion.button
+                           initial={{ scale: 0.9, opacity: 0 }}
+                           animate={{ scale: 1, opacity: 1 }}
+                           onClick={() => setShowCertificate(true)}
+                           className="mt-6 w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 group"
+                        >
+                           <Trophy size={18} className="group-hover:rotate-12 transition-transform" />
+                           Claim Certificate
+                        </motion.button>
+                     )}
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
@@ -131,7 +160,8 @@ export default function CourseLearningPage() {
             <div className="flex-1 overflow-y-auto p-6 sm:p-10 custom-scrollbar space-y-10">
                {/* DYNAMIC PLAYER / CONTENT */}
                <div className="max-w-5xl mx-auto">
-                  <AnimatePresence mode="wait">
+                  <SubscriptionGuard>
+                    <AnimatePresence mode="wait">
                      {activeLesson.type === 'video' && (
                         <motion.div key="video" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                            <CourseVideoPlayer
@@ -145,54 +175,10 @@ export default function CourseLearningPage() {
 
                      {activeLesson.type === 'live' && (
                         <motion.div key="live" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="aspect-video bg-[#050505] rounded-[2.5rem] flex flex-col relative overflow-hidden ring-8 ring-white dark:ring-white/5">
-                           <div className="flex-1 flex gap-4 p-4">
-                              {/* Main Video Stream */}
-                              <div className="flex-[3] bg-gray-900 rounded-3xl relative overflow-hidden flex items-center justify-center group">
-                                 <div className="absolute top-6 left-6 flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full" /> Live
-                                 </div>
-                                 <Users size={64} className="text-white/10" />
-                                 <div className="absolute bottom-6 left-6 text-white">
-                                    <p className="text-xs font-bold opacity-60">Instructor</p>
-                                    <p className="text-lg font-black italic">Dr. Elias Tadesse</p>
-                                 </div>
-                              </div>
-
-                              {/* Participants / Chat Panel */}
-                              <div className="flex-1 bg-white/5 dark:bg-white/5 rounded-3xl p-4 flex flex-col">
-                                 <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 mb-4">
-                                    <div className="p-3 bg-white/10 rounded-2xl">
-                                       <p className="text-[10px] font-bold text-emerald-400 mb-1">Dr. Elias</p>
-                                       <p className="text-[11px] text-white font-medium">Welcome everyone! Today we cover advanced derivatives.</p>
-                                    </div>
-                                    <div className="p-3 bg-white/5 rounded-2xl">
-                                       <p className="text-[10px] font-bold text-blue-400 mb-1">Marta G.</p>
-                                       <p className="text-[11px] text-white/80 font-medium">Hello Doctor! Ready for the session.</p>
-                                    </div>
-                                 </div>
-                                 <div className="mt-auto relative">
-                                    <input
-                                       type="text"
-                                       placeholder="Say something..."
-                                       className="w-full pl-4 pr-10 py-3 bg-white/10 rounded-xl text-[10px] font-medium text-white placeholder:text-white/40 border-none focus:ring-1 focus:ring-emerald-500"
-                                    />
-                                    <button className="absolute right-2 top-2 p-1 text-emerald-400"><Send size={14} /></button>
-                                 </div>
-                              </div>
-                           </div>
-
-                           {/* Control Bar */}
-                           <div className="bg-white/10 backdrop-blur-md p-6 flex justify-between items-center">
-                              <div className="flex gap-4">
-                                 <button className="p-3 bg-white/10 text-white rounded-2xl hover:bg-emerald-600 transition-all"><Users size={20} /></button>
-                                 <button className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-emerald-700 transition-all">
-                                    Raise Hand ✋
-                                 </button>
-                              </div>
-                              <button className="px-8 py-3 bg-red-600/20 text-red-500 border border-red-500/30 rounded-2xl font-black text-xs hover:bg-red-600 hover:text-white transition-all">
-                                 Leave Session
-                              </button>
-                           </div>
+                           <JitsiMeeting
+                              roomName={`EDA-Session-${activeLesson.id}`}
+                              userName="Student" // In real app, use user.name
+                           />
                         </motion.div>
                      )}
 
@@ -204,15 +190,20 @@ export default function CourseLearningPage() {
 
                      {activeLesson.type === 'quiz' && (
                         <motion.div key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                           <QuizInterface
-                              title={activeLesson.title}
-                              questions={MOCK_QUESTIONS}
-                              durationMinutes={15}
-                              onComplete={(score) => console.log(`Quiz completed with score: ${score}%`)}
+                           <QuizPlayer
+                              quizId={activeLesson.id}
+                              onComplete={() => {
+                                 console.log("Quiz completed!");
+                                 // Update local completion state
+                                 const updatedCurriculum = [...CURRICULUM];
+                                 const lesson = updatedCurriculum.flatMap(s => s.lessons).find(l => l.id === activeLesson.id);
+                                 if (lesson) lesson.completed = true;
+                              }}
                            />
                         </motion.div>
                      )}
                   </AnimatePresence>
+                  </SubscriptionGuard>
                </div>
 
                {/* LESSON DETAILS & TABS */}
@@ -231,7 +222,7 @@ export default function CourseLearningPage() {
 
                   {/* TABS */}
                   <div className="flex gap-10 border-b border-gray-100 dark:border-gray-800">
-                     {["overview", "resources", "discussion"].map(tab => (
+                     {["overview", "resources", "assignments", "discussion"].map(tab => (
                         <button
                            key={tab}
                            onClick={() => setActiveTab(tab)}
@@ -257,7 +248,16 @@ export default function CourseLearningPage() {
                            </ul>
                         </motion.div>
                      )}
-                     {/* ... resources and discussion tabs same as before ... */}
+                     {activeTab === 'assignments' && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                           <StudentAssignmentView courseId={courseId} />
+                        </motion.div>
+                     )}
+                     {activeTab === 'discussion' && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="h-[600px] mt-4">
+                           <DiscussionForum courseId={courseId} userRole="STUDENT" />
+                        </motion.div>
+                     )}
                   </div>
                </div>
             </div>
@@ -292,6 +292,17 @@ export default function CourseLearningPage() {
                <StickyNote size={20} /> {toolsOpen ? 'Hide Tools' : 'Learning Tools'}
             </button>
          </div>
+
+         <AnimatePresence>
+            {showCertificate && (
+               <CertificateRenderer 
+                  studentName={JSON.parse(localStorage.getItem('user') || '{}').name || "Student"}
+                  courseTitle="Advanced Calculus for G12"
+                  courseId={courseId}
+                  onClose={() => setShowCertificate(false)}
+               />
+            )}
+         </AnimatePresence>
       </div>
    );
 }

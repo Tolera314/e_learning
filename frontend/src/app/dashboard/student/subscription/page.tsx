@@ -1,126 +1,208 @@
-"use client";
+'use client';
 
-import { 
-  CreditCard, 
-  CheckCircle2, 
-  Clock, 
-  History, 
-  ArrowUpRight, 
-  Zap,
-  Smartphone,
-  ShieldCheck,
-  ChevronRight
-} from "lucide-react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Check, Zap, GraduationCap, School, BookOpen, Globe, ShieldCheck } from 'lucide-react';
+import api from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
-const TRANSACTIONS = [
-  { id: "TX-5421", plan: "Quarterly Pro Plan", amount: "450 ETB", date: "Oct 24, 2026", method: "Telebirr", status: "SUCCESS" },
-  { id: "TX-3298", plan: "Course: Advanced Calculus", amount: "1,200 ETB", date: "Sept 12, 2026", method: "CBE Birr", status: "SUCCESS" },
-];
+const PricingPage = () => {
+  const [loading, setLoading] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
 
-export default function StudentSubscription() {
+  const plans = [
+    {
+      id: 'KG_G5',
+      name: 'Primary (KG - G5)',
+      icon: <BookOpen className="w-8 h-8 text-blue-500" />,
+      monthlyPrice: 100,
+      yearlyPrice: 100 * 12 * 0.95,
+      features: [
+        'Full access to KG-G5 content',
+        'Interactive quizzes',
+        'Digital certificates',
+        'Teacher support',
+        'Offline viewing'
+      ],
+      color: 'blue'
+    },
+    {
+      id: 'G6_G12',
+      name: 'Secondary (G6 - G12)',
+      icon: <School className="w-8 h-8 text-purple-500" />,
+      monthlyPrice: 200,
+      yearlyPrice: 200 * 12 * 0.95,
+      features: [
+        'All G6-G12 curriculum',
+        'Advanced labs',
+        'College prep materials',
+        'Live group sessions',
+        'Priority support'
+      ],
+      color: 'purple',
+      popular: true
+    },
+    {
+      id: 'UNIVERSITY',
+      name: 'Higher Ed (University)',
+      icon: <GraduationCap className="w-8 h-8 text-amber-500" />,
+      monthlyPrice: 300,
+      yearlyPrice: 300 * 12 * 0.95,
+      features: [
+        'Specialized degree courses',
+        'Industry certifications',
+        'Expert-led live classes',
+        'Mentorship program',
+        'Portfolio building'
+      ],
+      color: 'amber'
+    }
+  ];
+
+  const handleSubscribe = async (planId: string) => {
+    setLoading(planId);
+    try {
+      const response = await api.post('/payments/checkout', {
+        segment: planId,
+        interval: billingCycle
+      });
+      
+      if (response.data.url) {
+        window.location.href = response.data.url;
+      }
+    } catch (error) {
+      toast.error('Failed to initiate checkout. Please try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto space-y-12">
-      <header>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Subscription & Billing</h1>
-        <p className="text-gray-500 mt-2">Manage your learning plans and view your payment history.</p>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-         {/* CURRENT PLAN */}
-         <div className="lg:col-span-2 space-y-8">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 dark:from-emerald-900/40 dark:to-blue-900/40 p-10 rounded-[3rem] text-white relative overflow-hidden shadow-2xl">
-               <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-6">
-                     <div className="p-2 bg-white/10 backdrop-blur-md rounded-xl">
-                        <Zap size={24} className="text-amber-400" />
-                     </div>
-                     <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">Current Active Plan</span>
-                  </div>
-                  
-                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-10">
-                     <div>
-                        <h2 className="text-4xl font-bold mb-2">Annual Premium</h2>
-                        <p className="text-emerald-100/70 text-sm">Full access to all courses, live sessions, and certificates.</p>
-                     </div>
-                     <div className="text-right">
-                        <p className="text-4xl font-bold">1,800 <span className="text-sm font-medium opacity-70">ETB/year</span></p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mt-1">Saves 40% vs Monthly</p>
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10 border-t border-white/10">
-                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Status</p>
-                        <div className="flex items-center gap-2 text-sm font-bold">
-                           <CheckCircle2 size={16} className="text-emerald-400" /> Active
-                        </div>
-                     </div>
-                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Next Billing</p>
-                        <p className="text-sm font-bold">Oct 24, 2027</p>
-                     </div>
-                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Trial Status</p>
-                        <p className="text-sm font-bold text-amber-400">Ended</p>
-                     </div>
-                  </div>
-               </div>
-               <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-12">
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-4xl font-extrabold text-slate-900 sm:text-5xl"
+          >
+            Invest in Your Future
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mt-4 text-xl text-slate-600"
+          >
+            Access premium education tailored for Ethiopia. Start with a 3-day free trial.
+          </motion.p>
+          
+          <div className="mt-8 flex justify-center">
+            <div className="relative bg-white rounded-full p-1 shadow-sm border border-slate-200">
+              <button
+                onClick={() => setBillingCycle('MONTHLY')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all ${
+                  billingCycle === 'MONTHLY' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle('YEARLY')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all ${
+                  billingCycle === 'YEARLY' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Yearly (5% Off)
+              </button>
             </div>
+          </div>
+        </div>
 
-            {/* PAYMENT METHODS (PHILLIPS) */}
-            <div className="bg-white dark:bg-[#111] p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-sm">
-               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-8">Preferred Payment Methods</h3>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="p-6 rounded-3xl border-2 border-emerald-500 bg-emerald-50/10 flex items-center gap-4 group cursor-pointer">
-                     <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
-                        <Smartphone size={24} />
-                     </div>
-                     <div className="flex-1">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">Telebirr Wallet</p>
-                        <p className="text-xs text-emerald-600 font-medium italic">Primary Method</p>
-                     </div>
-                     <CheckCircle2 size={20} className="text-emerald-600" />
-                  </div>
-                  <div className="p-6 rounded-3xl border-2 border-gray-100 dark:border-gray-800 flex items-center gap-4 group cursor-pointer hover:border-emerald-200 transition-all">
-                     <div className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-blue-600">
-                        <ShieldCheck size={24} />
-                     </div>
-                     <div className="flex-1">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">CBE Birr</p>
-                        <p className="text-xs text-gray-500 font-medium">Added Sept 2026</p>
-                     </div>
-                  </div>
-               </div>
-               <button className="w-full mt-8 py-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl text-xs font-bold text-gray-500 hover:text-emerald-600 transition-all">Add New Payment System</button>
-            </div>
-         </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map((plan, index) => (
+            <motion.div
+              key={plan.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
+              className={`relative bg-white rounded-3xl p-8 shadow-xl border-2 transition-transform hover:scale-105 ${
+                plan.popular ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-100'
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute top-0 right-8 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg">
+                  Most Popular
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between mb-8">
+                <div className={`p-3 rounded-2xl bg-blue-50`}>
+                  {plan.icon}
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl font-bold text-slate-900">
+                    ETB {billingCycle === 'MONTHLY' ? plan.monthlyPrice : Math.round(plan.yearlyPrice)}
+                  </span>
+                  <span className="text-slate-500 block text-sm">
+                    per {billingCycle === 'MONTHLY' ? 'month' : 'year'}
+                  </span>
+                </div>
+              </div>
 
-         {/* TRANSACTION HISTORY */}
-         <div className="bg-white dark:bg-[#111] p-8 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-8 flex items-center gap-2">
-               <History size={20} className="text-emerald-600" /> Billing History
-            </h3>
-            <div className="space-y-8 flex-1">
-               {TRANSACTIONS.map((tx, i) => (
-                  <div key={i} className="flex gap-4 group">
-                     <div className="w-10 h-10 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors">
-                        <ArrowUpRight size={18} />
-                     </div>
-                     <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                           <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{tx.plan}</p>
-                           <p className="text-sm font-bold text-emerald-600 shrink-0">{tx.amount}</p>
-                        </div>
-                        <p className="text-[10px] text-gray-500 mt-1">{tx.date} • {tx.method}</p>
-                     </div>
-                  </div>
-               ))}
+              <h3 className="text-xl font-bold text-slate-900 mb-6">{plan.name}</h3>
+
+              <ul className="space-y-4 mb-8">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-start">
+                    <Check className={`w-5 h-5 mr-3 text-emerald-500 flex-shrink-0 mt-0.5`} />
+                    <span className="text-slate-600 text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                onClick={() => handleSubscribe(plan.id)}
+                disabled={loading === plan.id}
+                className={`w-full py-4 px-6 rounded-2xl font-bold transition-all flex items-center justify-center ${
+                  plan.popular 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30' 
+                  : 'bg-slate-900 text-white hover:bg-slate-800'
+                } disabled:opacity-50`}
+              >
+                {loading === plan.id ? (
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5 mr-2" />
+                    Get Started
+                  </>
+                )}
+              </button>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-16 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="flex items-center gap-4 text-left">
+            <div className="bg-emerald-100 p-3 rounded-full">
+              <ShieldCheck className="w-8 h-8 text-emerald-600" />
             </div>
-            <button className="w-full mt-10 py-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-2xl text-xs font-bold hover:bg-emerald-100 transition-all">Download All Invoices</button>
-         </div>
+            <div>
+              <h4 className="text-lg font-bold text-slate-900">100% Secure Checkout</h4>
+              <p className="text-slate-600 text-sm">Encrypted transactions processed by Stripe.</p>
+            </div>
+          </div>
+          <div className="flex gap-4 opacity-50 grayscale hover:grayscale-0 transition-all">
+            <Globe className="w-8 h-8" />
+            <div className="text-sm font-bold text-slate-400 self-center uppercase tracking-widest">
+              Available Nationwide
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default PricingPage;

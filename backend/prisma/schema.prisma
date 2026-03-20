@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -74,8 +75,37 @@ model User {
   activityLogs    StudentActivityLog[]
   sentChatMessages LiveSessionChatLog[]
   videoMetrics    VideoStreamMetric[]
+  assignmentSubmissions AssignmentSubmission[]
 
+  discussionThreads DiscussionThread[] @relation("ThreadAuthor")
+  discussionReplies DiscussionReply[] @relation("ReplyAuthor")
+  discussionReactions DiscussionReaction[] @relation("ReactionUser")
+  discussionFollows DiscussionFollow[] @relation("FollowUser")
+  moderatorActions  ModerationLog[] @relation("ModeratorAction")
+
+  notifications     Notification[]
+  following         Follower[] @relation("StudentFollowing")
+  sentMessages      Message[] @relation("MessageSender")
+  conversations     ConversationParticipant[]
+  signature         Signature?
+  reviews           Review[]
+  searchLogs        SearchLog[]
+  
   @@map("users")
+}
+
+model SearchLog {
+  id            String   @id @default(uuid())
+  userId        String?  @map("user_id")
+  query         String
+  resultsCount  Int      @default(0) @map("results_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@map("search_logs")
+  @@index([query])
+  @@index([createdAt])
 }
 
 model StudentProfile {
@@ -122,7 +152,27 @@ model InstructorProfile {
   
   isApproved        Boolean  @default(false) @map("is_approved")
   
+  // Monetization Metrics
+  followerCount     Int      @default(0) @map("follower_count")
+  totalWatchMinutes Int      @default(0) @map("total_watch_minutes")
+  
+  // Relations
+  followers         Follower[]
+  
   @@map("instructor_profiles")
+}
+
+model Follower {
+  id           String   @id @default(uuid())
+  studentId    String   @map("student_id")
+  instructorId String   @map("instructor_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  student      User @relation("StudentFollowing", fields: [studentId], references: [id])
+  instructor   InstructorProfile @relation(fields: [instructorId], references: [id])
+
+  @@unique([studentId, instructorId])
+  @@map("followers")
 }
 
 model Subscription {
@@ -132,6 +182,8 @@ model Subscription {
   startsAt      DateTime        @map("starts_at")
   expiresAt     DateTime        @map("expires_at")
   isTrial       Boolean         @default(false) @map("is_trial")
+  planType      PlanType        @default(MONTHLY) @map("plan_type")
+  stripeSessionId String?       @unique @map("stripe_session_id")
   
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
@@ -141,7 +193,12 @@ model Subscription {
 
   @@map("subscriptions")
   @@index([studentId])
-  @@index([studentId, expiresAt])  // Added: efficient active subscription lookups
+  @@index([studentId, expiresAt])
+}
+
+enum PlanType {
+  MONTHLY
+  YEARLY
 }
 
 model Transaction {
@@ -201,6 +258,8 @@ model Course {
   certificates     Certificate[]
   exams            ExamTest[]
   activityLogs     StudentActivityLog[]
+  discussionThreads DiscussionThread[]
+  reviews           Review[]
 
   @@map("courses")
   @@index([instructorId])
@@ -244,6 +303,7 @@ model Lesson {
   progress        LessonProgress[]
   quizzes         Quiz[]
   liveSession     LiveSession?
+  assignment      Assignment?
   videoMetrics    VideoStreamMetric[]
 
   @@map("lessons")
@@ -330,8 +390,8 @@ model QuizSubmission {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  student   User     @relation(fields: [studentId], references: [id])
-  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   answers   QuizAnswer[]
 
   @@map("quiz_submissions")
@@ -344,16 +404,18 @@ model Certificate {
   studentId        String   @map("student_id")
   courseId         String   @map("course_id")
   verificationCode String   @unique @map("verification_code")
-  pdfUrl           String   @map("pdf_url")
+  pdfUrl           String?  @map("pdf_url")
   
-  issuedAt         DateTime @default(now()) @map("issued_at")
+  issueDate        DateTime @default(now()) @map("issue_date")
+  createdAt        DateTime @default(now()) @map("created_at")
 
-  // Relations
-  student          User     @relation(fields: [studentId], references: [id])
-  course           Course   @relation(fields: [courseId], references: [id])
+  student          User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@map("certificates")
   @@index([studentId])
+  @@index([courseId])
+  @@index([verificationCode])
 }
 
 model LiveSession {
@@ -379,8 +441,8 @@ model Question {
   text        String
   points      Int      @default(1)
   
-  quiz        Quiz?     @relation(fields: [quizId], references: [id])
-  exam        ExamTest? @relation(fields: [examId], references: [id])
+  quiz        Quiz?     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  exam        ExamTest? @relation(fields: [examId], references: [id], onDelete: Cascade)
   options     QuestionOption[]
   answers     QuizAnswer[]
 
@@ -393,7 +455,7 @@ model QuestionOption {
   text        String
   isCorrect   Boolean  @default(false) @map("is_correct")
   
-  question    Question @relation(fields: [questionId], references: [id])
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@map("question_options")
 }
@@ -402,13 +464,17 @@ model ExamTest {
   id          String   @id @default(uuid())
   courseId    String   @map("course_id")
   title       String
-  description String?
-  durationMinutes Int @map("duration_minutes")
+  description String?  @db.Text
+  totalPoints Int      @default(100) @map("total_points")
   
-  course      Course   @relation(fields: [courseId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   questions   Question[]
 
-  @@map("exam_tests")
+  @@map("exams")
+  @@index([courseId])
 }
 model LiveSessionAttendance {
   id            String   @id @default(uuid())
@@ -428,9 +494,10 @@ model QuizAnswer {
   submissionId    String   @map("submission_id")
   questionId      String   @map("question_id")
   selectedOptionId String  @map("selected_option_id")
+  isCorrect       Boolean  @default(false) @map("is_correct")
   
-  submission      QuizSubmission @relation(fields: [submissionId], references: [id])
-  question        Question       @relation(fields: [questionId], references: [id])
+  submission      QuizSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question        Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@map("quiz_answers")
 }
@@ -527,4 +594,236 @@ model VideoStreamMetric {
   lesson          Lesson   @relation(fields: [lessonId], references: [id])
 
   @@map("video_stream_metrics")
+}
+
+model Assignment {
+  id              String   @id @default(uuid())
+  lessonId        String   @unique @map("lesson_id")
+  instructions    String   @db.Text
+  deadline        DateTime?
+  maxPoints       Int      @default(100) @map("max_points")
+  allowedFileTypes String[] @default(["pdf", "docx", "zip"]) @map("allowed_file_types")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  lesson          Lesson   @relation(fields: [lessonId], references: [id])
+  submissions     AssignmentSubmission[]
+
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id              String   @id @default(uuid())
+  assignmentId    String   @map("assignment_id")
+  studentId       String   @map("student_id")
+  fileUrl         String   @map("file_url")
+  originalName    String?  @map("original_name")
+  fileSize        Int?     @map("file_size")
+  status          String   @default("SUBMITTED") // SUBMITTED, GRADED, RESUBMISSION_REQUIRED
+  
+  grade           Int?
+  feedback        String?  @db.Text
+  
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+  gradedAt        DateTime? @map("graded_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  assignment      Assignment @relation(fields: [assignmentId], references: [id])
+  student         User       @relation(fields: [studentId], references: [id])
+
+  @@map("assignment_submissions")
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+model DiscussionThread {
+  id              String   @id @default(uuid())
+  courseId        String   @map("course_id")
+  authorId        String   @map("author_id")
+  title           String
+  content         String   @db.Text
+  isPinned        Boolean  @default(false) @map("is_pinned")
+  isAnnouncement  Boolean  @default(false) @map("is_announcement")
+  status          String   @default("ACTIVE") // ACTIVE, LOCKED, DELETED
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  course          Course   @relation(fields: [courseId], references: [id])
+  author          User     @relation("ThreadAuthor", fields: [authorId], references: [id])
+  
+  replies         DiscussionReply[]
+  reactions       DiscussionReaction[]
+  followers       DiscussionFollow[]
+
+  @@map("discussion_threads")
+  @@index([courseId])
+  @@index([authorId])
+}
+
+model DiscussionReply {
+  id              String   @id @default(uuid())
+  threadId        String   @map("thread_id")
+  authorId        String   @map("author_id")
+  content         String   @db.Text
+  parentId        String?  @map("parent_id")
+  isDeleted       Boolean  @default(false) @map("is_deleted")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  thread          DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author          User             @relation("ReplyAuthor", fields: [authorId], references: [id])
+  parent          DiscussionReply? @relation("NestedReplies", fields: [parentId], references: [id])
+  children        DiscussionReply[] @relation("NestedReplies")
+  reactions       DiscussionReaction[]
+
+  @@map("discussion_replies")
+  @@index([threadId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model DiscussionReaction {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  threadId        String?  @map("thread_id")
+  replyId         String?  @map("reply_id")
+  type            String   // LIKE, HEART, etc.
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user            User     @relation("ReactionUser", fields: [userId], references: [id])
+  thread          DiscussionThread? @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  reply           DiscussionReply?  @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@map("discussion_reactions")
+  @@index([userId])
+  @@index([threadId])
+  @@index([replyId])
+  @@unique([userId, threadId, type]) // User can only like a thread once
+  @@unique([userId, replyId, type])  // User can only like a reply once
+}
+
+model DiscussionFollow {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  threadId        String   @map("thread_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user            User     @relation("FollowUser", fields: [userId], references: [id])
+  thread          DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@map("discussion_follows")
+  @@unique([userId, threadId])
+  @@index([userId])
+  @@index([threadId])
+}
+
+model ModerationLog {
+  id              String   @id @default(uuid())
+  adminId         String   @map("admin_id") // Instructor or Admin
+  action          String   // DELETE_THREAD, DELETE_REPLY, WARNING, SUSPEND
+  reason          String?  @db.Text
+  targetId        String   @map("target_id")
+  targetType      String   @map("target_type") // THREAD, REPLY, USER
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  admin           User     @relation("ModeratorAction", fields: [adminId], references: [id])
+
+  @@map("moderation_logs")
+  @@index([adminId])
+  @@index([targetId])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  type        String   // COURSE, QUIZ, ASSIGNMENT, LIVE_CLASS, GENERAL
+  title       String
+  message     String   @db.Text
+  linkUrl     String?  @map("link_url")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  title         String?  // Optional for group chats
+  isGroup       Boolean  @default(false) @map("is_group")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id              String       @id @default(uuid())
+  conversationId  String       @map("conversation_id")
+  userId          String       @map("user_id")
+  joinedAt        DateTime     @default(now()) @map("joined_at")
+  lastReadAt      DateTime?    @map("last_read_at")
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_participants")
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  conversationId  String       @map("conversation_id")
+  senderId        String       @map("sender_id")
+  content         String       @db.Text
+  isRead          Boolean      @default(false) @map("is_read") // Simplistic representation for 1-1 chats
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+  @@index([conversationId, createdAt])
+}
+
+model Signature {
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  signatureUrl String   @map("signature_url")
+  role         String   // CEO, INSTRUCTOR
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("signatures")
+}
+model Review {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  courseId    String   @map("course_id")
+  rating      Int      @default(5)
+  comment     String?  @db.Text
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@map("reviews")
+  @@index([courseId])
 }

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { recordActivity } from "@/lib/api";
+import api from "@/lib/api";
 
 interface VideoPlayerProps {
   id: string; // Add ID prop for activity tracking
@@ -62,6 +63,12 @@ export default function CourseVideoPlayer({ id, src, onProgress, onComplete, ini
 
       // Throttled logging (every 30 seconds or significant progress)
       if (currentTime - lastLoggedTime.current > 30) {
+        // Report specific progress to update instructor watch time
+        api.post(`/student/lessons/${id}/progress`, {
+          progress: Math.floor(progress),
+          durationWatched: currentTime - lastLoggedTime.current
+        }).catch(err => console.error("Progress report failed", err));
+
         recordActivity('WATCH_VIDEO', undefined, {
           lessonId: id,
           progress: Math.floor(progress),

@@ -36,6 +36,9 @@ app.use(cors({
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
+// Static files for uploads (Assignment submissions)
+app.use('/uploads', express.static('uploads'));
+
 // Auth Rate Limiting — prevent brute-force attacks (20 requests per 15 min)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -59,6 +62,15 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import courseRoutes from "./routes/courseRoutes";
 import enrollmentRoutes from "./routes/enrollmentRoutes";
 import instructorRoutes from "./routes/instructorRoutes";
+import studentRoutes from "./routes/studentRoutes";
+import discussionRoutes from "./routes/discussionRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
+import messageRoutes from "./routes/messageRoutes";
+import quizRoutes from "./routes/quizRoutes";
+import signatureRoutes from "./routes/signatureRoutes";
+import certificateRoutes from "./routes/certificateRoutes";
+import paymentRoutes from "./routes/paymentRoutes";
+import searchRoutes from "./routes/searchRoutes";
 
 // Routes — auth routes have stricter rate limits
 app.use("/api/auth", authLimiter, authRoutes);
@@ -66,6 +78,15 @@ app.use("/api/dashboard", apiLimiter, dashboardRoutes);
 app.use("/api/courses", apiLimiter, courseRoutes);
 app.use("/api/enrollments", apiLimiter, enrollmentRoutes);
 app.use("/api/instructor", apiLimiter, instructorRoutes);
+app.use("/api/student", apiLimiter, studentRoutes);
+app.use("/api", apiLimiter, discussionRoutes); // discussionRoutes contains its own prefix overrides (like /courses/:courseId/discussions)
+app.use("/api/notifications", apiLimiter, notificationRoutes);
+app.use("/api/messages", apiLimiter, messageRoutes);
+app.use("/api/quizzes", apiLimiter, quizRoutes);
+app.use("/api/signatures", apiLimiter, signatureRoutes);
+app.use("/api/certificates", apiLimiter, certificateRoutes);
+app.use("/api/payments", paymentRoutes); // Prefix handles its own auth/raw-body as needed
+app.use("/api/search", apiLimiter, searchRoutes);
 
 // Basic Health Check
 app.get("/api/health", (req: Request, res: Response) => {

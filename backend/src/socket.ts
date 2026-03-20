@@ -4,6 +4,8 @@ import { chatService } from './services/chatService';
 import { verifyToken } from './utils/jwt';
 import logger from './utils/logger';
 
+let ioInstance: IOServer | null = null;
+
 export function initSocketServer(httpServer: HTTPServer): IOServer {
   const io = new IOServer(httpServer, {
     cors: {
@@ -13,6 +15,8 @@ export function initSocketServer(httpServer: HTTPServer): IOServer {
     },
     transports: ['websocket', 'polling'],
   });
+
+  ioInstance = io;
 
   chatService.setSocketServer(io);
 
@@ -51,6 +55,22 @@ export function initSocketServer(httpServer: HTTPServer): IOServer {
       socket.leave(`session:${sessionId}`);
     });
 
+    // Course room subscriptions for Discussions
+    socket.on('course:join', (courseId: string) => {
+      socket.join(`course_${courseId}`);
+      logger.debug({ userId: user.id, courseId }, 'User joined course room');
+    });
+
+    socket.on('course:leave', (courseId: string) => {
+      socket.leave(`course_${courseId}`);
+    });
+
+    // Global User Private Room
+    socket.on('user:join', () => {
+      socket.join(`user:${user.id}`);
+      logger.debug({ userId: user.id }, 'User joined private socket room');
+    });
+
     // Send a chat message
     socket.on('chat:send', async (data: { sessionId: string; message: string }) => {
       if (!data.sessionId || !data.message?.trim()) return;
@@ -78,4 +98,8 @@ export function initSocketServer(httpServer: HTTPServer): IOServer {
   });
 
   return io;
+}
+
+export function getSocketServer(): IOServer | null {
+  return ioInstance;
 }

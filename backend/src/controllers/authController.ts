@@ -259,6 +259,30 @@ export const completeOnboarding = async (req: Request, res: Response): Promise<v
       data: { onboardingCompleted: true }
     });
 
+    // AUTO-PROVISION 3-DAY FREE TRIAL FOR STUDENTS
+    if (user.role === 'STUDENT' && !user.trialUsed) {
+      const trialExpiry = new Date();
+      trialExpiry.setDate(trialExpiry.getDate() + 3);
+
+      await prisma.subscription.create({
+        data: {
+          studentId: userId,
+          segmentAccess: data.educationLevel || 'UNIVERSITY', // Default or chosen segment
+          startsAt: new Date(),
+          expiresAt: trialExpiry,
+          isTrial: true,
+          planType: 'MONTHLY' as any
+        }
+      });
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { trialUsed: true }
+      });
+
+      console.log(`[SUBSCRIPTION] 3-Day Trial provisioned for user ${userId}`);
+    }
+
     res.json({ message: 'Onboarding completed successfully' });
   } catch (error) {
     console.error('Onboarding Error:', error);

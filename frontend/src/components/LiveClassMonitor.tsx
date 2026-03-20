@@ -13,9 +13,10 @@ import {
    TrendingUp,
    AlertCircle
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import api from "@/lib/api";
 import { socketService } from "@/lib/socket";
+import JitsiMeeting from "./JitsiMeeting";
 
 interface LiveSession {
    id: string;
@@ -32,6 +33,7 @@ interface LiveSession {
 export default function LiveClassMonitor() {
    const [sessions, setSessions] = useState<LiveSession[]>([]);
    const [loading, setLoading] = useState(true);
+   const [activeRoom, setActiveRoom] = useState<{ name: string; sessionTitle: string } | null>(null);
 
    useEffect(() => {
       const fetchSessions = async () => {
@@ -133,7 +135,10 @@ export default function LiveClassMonitor() {
                               </button>
                            </>
                         ) : (
-                           <button className="w-full xl:w-auto px-8 py-4 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-gray-500/20">
+                           <button
+                              onClick={() => setActiveRoom({ name: `EDA-Session-${session.id}`, sessionTitle: session.title })}
+                              className="w-full xl:w-auto px-8 py-4 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-gray-500/20"
+                           >
                               <Play size={18} /> Start Session
                            </button>
                         )}
@@ -142,6 +147,38 @@ export default function LiveClassMonitor() {
                </motion.div>
             ))}
          </div>
+
+         {/* JITSI MEETING OVERLAY */}
+         <AnimatePresence>
+            {activeRoom && (
+               <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl p-4 md:p-10 flex flex-col"
+               >
+                  <div className="flex justify-between items-center mb-6">
+                     <div>
+                        <h2 className="text-white text-2xl font-black">{activeRoom.sessionTitle}</h2>
+                        <p className="text-emerald-500 text-xs font-bold uppercase tracking-widest">Live Instructor Control Panel</p>
+                     </div>
+                     <button
+                        onClick={() => setActiveRoom(null)}
+                        className="px-6 py-3 bg-white/10 text-white rounded-xl font-bold text-xs hover:bg-red-600 transition-all"
+                     >
+                        Close Session
+                     </button>
+                  </div>
+                  <div className="flex-1 bg-black rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
+                     <JitsiMeeting
+                        roomName={activeRoom.name}
+                        userName="Instructor" // In real app, use user.name
+                        onClose={() => setActiveRoom(null)}
+                     />
+                  </div>
+               </motion.div>
+            )}
+         </AnimatePresence>
 
          {/* RECENT QUESTIONS / ACTIVITY OVERVIEW */}
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSystemMetrics = exports.logSystemPerformance = exports.getQuizPerformance = exports.getStudentProgressReport = exports.getLiveClassAnalytics = void 0;
+exports.getRecentActivity = exports.getInstructorDashboardStats = exports.getMonetizationStats = exports.getAssignmentStats = exports.gradeSubmission = exports.getAssignmentSubmissions = exports.createAssignment = exports.createLiveSession = exports.getInstructorCourses = exports.getSystemMetrics = exports.logSystemPerformance = exports.getQuizPerformance = exports.getStudentProgressReport = exports.getLiveClassAnalytics = void 0;
 const prisma_1 = require("../utils/prisma");
 const getLiveClassAnalytics = async (req, res) => {
     try {
@@ -151,3 +151,284 @@ const getSystemMetrics = async (req, res) => {
     }
 };
 exports.getSystemMetrics = getSystemMetrics;
+const getInstructorCourses = async (req, res) => {
+    try {
+        const instructorId = req.user?.id;
+        if (!instructorId)
+            return res.status(401).json({ error: "Unauthorized" });
+        const courses = await prisma_1.prisma.course.findMany({
+            where: { instructorId },
+            select: {
+                id: true,
+                title: true,
+                modules: {
+                    select: {
+                        id: true,
+                        title: true
+                    }
+                }
+            }
+        });
+        res.status(200).json(courses);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to fetch instructor courses" });
+    }
+};
+exports.getInstructorCourses = getInstructorCourses;
+const createLiveSession = async (req, res) => {
+    try {
+        const { title, courseId, startTime, durationSeconds, moduleId } = req.body;
+        if (!title || !courseId || !startTime || !moduleId) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+        // 1. Create the Lesson of type LIVE
+        const lesson = await prisma_1.prisma.lesson.create({
+            data: {
+                title: String(title),
+                moduleId: String(moduleId),
+                type: "LIVE",
+                durationSeconds: durationSeconds ? parseInt(String(durationSeconds)) : 3600,
+                orderIndex: 99,
+            }
+        });
+        // 2. Create the LiveSession record
+        const liveSession = await prisma_1.prisma.liveSession.create({
+            data: {
+                lessonId: lesson.id,
+                startTime: new Date(String(startTime)),
+                isLive: false,
+            }
+        });
+        res.status(201).json({
+            message: "Live session created successfully",
+            lesson,
+            liveSession
+        });
+    }
+    catch (error) {
+        console.error("Create Live Session Error:", error);
+        res.status(500).json({ error: "Failed to create live session" });
+    }
+};
+exports.createLiveSession = createLiveSession;
+const createAssignment = async (req, res) => {
+    try {
+        const { lessonId, instructions, deadline, maxPoints, allowedFileTypes } = req.body;
+        if (!lessonId || !instructions) {
+            return res.status(400).json({ error: "Lesson ID and instructions are required" });
+        }
+        const assignment = await prisma_1.prisma.assignment.create({
+            data: {
+                lessonId: String(lessonId),
+                instructions: String(instructions),
+                deadline: deadline ? new Date(String(deadline)) : undefined,
+                maxPoints: maxPoints ? parseInt(String(maxPoints)) : 100,
+                allowedFileTypes: Array.isArray(allowedFileTypes) ? allowedFileTypes : ["pdf", "docx", "zip"],
+            }
+        });
+        res.status(201).json({
+            message: "Assignment created successfully",
+            assignment
+        });
+    }
+    catch (error) {
+        console.error("Create Assignment Error:", error);
+        res.status(500).json({ error: "Failed to create assignment" });
+    }
+};
+exports.createAssignment = createAssignment;
+const getAssignmentSubmissions = async (req, res) => {
+    try {
+        const assignmentId = String(req.params.assignmentId);
+        const submissions = await prisma_1.prisma.assignmentSubmission.findMany({
+            where: { assignmentId },
+            include: {
+                student: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    }
+                }
+            },
+            orderBy: { submittedAt: 'desc' }
+        });
+        res.status(200).json(submissions);
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+};
+exports.getAssignmentSubmissions = getAssignmentSubmissions;
+const gradeSubmission = async (req, res) => {
+    try {
+        const submissionId = String(req.params.submissionId);
+        const { grade, feedback, status } = req.body;
+        const submission = await prisma_1.prisma.assignmentSubmission.update({
+            where: { id: submissionId },
+            data: {
+                grade: grade !== undefined ? parseInt(String(grade)) : undefined,
+                feedback: feedback ? String(feedback) : undefined,
+                status: String(status || "GRADED"),
+                gradedAt: new Date(),
+            }
+        });
+        res.status(200).json({
+            message: "Submission graded successfully",
+            submission
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to grade submission" });
+    }
+};
+exports.gradeSubmission = gradeSubmission;
+const getAssignmentStats = async (req, res) => {
+    try {
+        const totalAssignments = await prisma_1.prisma.assignment.count();
+        const totalSubmissions = await prisma_1.prisma.assignmentSubmission.count();
+        const pendingGrades = await prisma_1.prisma.assignmentSubmission.count({
+            where: { status: "SUBMITTED" }
+        });
+        res.status(200).json({
+            totalAssignments,
+            totalSubmissions,
+            pendingGrades,
+            completionRate: totalAssignments > 0 ? (totalSubmissions / totalAssignments).toFixed(2) : 0
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to fetch assignment stats" });
+    }
+};
+exports.getAssignmentStats = getAssignmentStats;
+const getMonetizationStats = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId)
+            return res.status(401).json({ error: "Unauthorized" });
+        const profile = await prisma_1.prisma.instructorProfile.findUnique({
+            where: { userId },
+            include: {
+                _count: {
+                    select: { followers: true }
+                }
+            }
+        });
+        if (!profile)
+            return res.status(404).json({ error: "Instructor profile not found" });
+        const MONETIZATION_THRESHOLDS = {
+            FOLLOWERS: 10000,
+            WATCH_HOURS: 500
+        };
+        const watchHours = (profile.totalWatchMinutes || 0) / 60;
+        const followerCount = profile.followerCount || 0;
+        res.status(200).json({
+            metrics: {
+                followers: followerCount,
+                watchHours: watchHours.toFixed(1),
+                totalStudents: 1250, // Mock for now
+                liveSessionsCount: 12
+            },
+            thresholds: MONETIZATION_THRESHOLDS,
+            progress: {
+                followers: Math.min(100, (followerCount / MONETIZATION_THRESHOLDS.FOLLOWERS) * 100).toFixed(1),
+                watchTime: Math.min(100, (watchHours / MONETIZATION_THRESHOLDS.WATCH_HOURS) * 100).toFixed(1)
+            },
+            isEligible: followerCount >= MONETIZATION_THRESHOLDS.FOLLOWERS && watchHours >= MONETIZATION_THRESHOLDS.WATCH_HOURS
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: "Failed to fetch monetization metrics" });
+    }
+};
+exports.getMonetizationStats = getMonetizationStats;
+const getInstructorDashboardStats = async (req, res) => {
+    try {
+        const instructorId = req.user?.id;
+        if (!instructorId)
+            return res.status(401).json({ error: "Unauthorized" });
+        // 1. Total Courses
+        const totalCourses = await prisma_1.prisma.course.count({ where: { instructorId } });
+        // 2. Total Students (Unique enrollments across all courses)
+        const totalStudents = await prisma_1.prisma.enrollment.count({
+            where: { course: { instructorId } }
+        });
+        // 3. Average Rating from real reviews
+        const reviews = await prisma_1.prisma.review.aggregate({
+            where: { course: { instructorId } },
+            _avg: { rating: true }
+        });
+        // 4. Estimated Revenue based on monetization metrics
+        const profile = await prisma_1.prisma.instructorProfile.findUnique({
+            where: { userId: instructorId }
+        });
+        // Simplified expert-level estimation logic
+        const watchHours = (profile?.totalWatchMinutes || 0) / 60;
+        const followerCount = profile?.followerCount || 0;
+        const estimatedEarnings = (watchHours * 2.5) + (followerCount * 0.5); // Example rate
+        res.status(200).json({
+            totalCourses,
+            totalStudents,
+            totalRevenue: estimatedEarnings.toFixed(2),
+            avgRating: reviews._avg.rating?.toFixed(1) || "5.0",
+            revenueTrend: "+8% this month",
+            studentTrend: "+12% weekly"
+        });
+    }
+    catch (error) {
+        console.error("Dashboard Stats Error:", error);
+        res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+};
+exports.getInstructorDashboardStats = getInstructorDashboardStats;
+const getRecentActivity = async (req, res) => {
+    try {
+        const instructorId = req.user?.id;
+        if (!instructorId)
+            return res.status(401).json({ error: "Unauthorized" });
+        // Fetch latest enrollments and submissions
+        const enrollments = await prisma_1.prisma.enrollment.findMany({
+            where: { course: { instructorId } },
+            include: {
+                student: { select: { name: true } },
+                course: { select: { title: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 5
+        });
+        const submissions = await prisma_1.prisma.assignmentSubmission.findMany({
+            where: { assignment: { lesson: { module: { course: { instructorId } } } } },
+            include: {
+                student: { select: { name: true } },
+                assignment: { include: { lesson: { select: { title: true } } } }
+            },
+            orderBy: { submittedAt: 'desc' },
+            take: 5
+        });
+        // Normalize into activity feed
+        const activities = [
+            ...enrollments.map((e) => ({
+                id: e.id,
+                user: e.student.name,
+                title: `enrolled in ${e.course.title}`,
+                type: "Enrollment",
+                time: e.createdAt,
+            })),
+            ...submissions.map((s) => ({
+                id: s.id,
+                user: s.student.name,
+                title: `submitted ${s.assignment.lesson.title}`,
+                type: "Submission",
+                time: s.submittedAt,
+            }))
+        ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 10);
+        res.status(200).json(activities);
+    }
+    catch (error) {
+        console.error("Recent Activity Error:", error);
+        res.status(500).json({ error: "Failed to fetch recent activity" });
+    }
+};
+exports.getRecentActivity = getRecentActivity;

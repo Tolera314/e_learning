@@ -1,16 +1,27 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendOTPEmail = void 0;
-const resend_1 = require("resend");
-const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
+const nodemailer_1 = __importDefault(require("nodemailer"));
+// Configure Brevo SMTP transporter
+const transporter = nodemailer_1.default.createTransport({
+    host: process.env.BREVO_SMTP_HOST,
+    port: Number(process.env.BREVO_SMTP_PORT) || 587,
+    auth: {
+        user: process.env.BREVO_SMTP_USER,
+        pass: process.env.BREVO_SMTP_PASS,
+    },
+});
 const sendOTPEmail = async (email, otp, name) => {
     try {
-        const { data, error } = await resend.emails.send({
-            from: 'Ethio-Digital-Academy <onboarding@resend.dev>',
-            to: [email],
+        const mailOptions = {
+            from: `"${process.env.BREVO_FROM_NAME || 'Ethio-Digital Academy'}" <${process.env.BREVO_FROM_EMAIL}>`,
+            to: email,
             subject: 'Verify your Ethio-Digital-Academy Account',
             html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; rounded: 12px;">
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 12px;">
           <h2 style="color: #059669;">Welcome to Ethio-Digital-Academy!</h2>
           <p>Hi ${name},</p>
           <p>Thank you for signing up. Please use the following code to verify your account:</p>
@@ -23,13 +34,10 @@ const sendOTPEmail = async (email, otp, name) => {
           <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2026 Ethio-Digital-Academy. All rights reserved.</p>
         </div>
       `,
-        });
-        if (error) {
-            console.error('[MAIL ERROR] Failed to send OTP email:', error);
-            return { success: false, error };
-        }
-        console.log(`[MAIL SUCCESS] OTP sent to ${email}. ID: ${data?.id}`);
-        return { success: true, data };
+        };
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[MAIL SUCCESS] OTP sent via Brevo to ${email}. MessageId: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
     }
     catch (err) {
         console.error('[MAIL CRITICAL ERROR] Unexpected error in sendOTPEmail:', err);

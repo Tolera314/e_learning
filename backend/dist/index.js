@@ -33,6 +33,8 @@ app.use((0, cors_1.default)({
 // Payload parsing
 app.use(express_1.default.json({ limit: "1mb" }));
 app.use(express_1.default.urlencoded({ extended: true, limit: "1mb" }));
+// Static files for uploads (Assignment submissions)
+app.use('/uploads', express_1.default.static('uploads'));
 // Auth Rate Limiting — prevent brute-force attacks (20 requests per 15 min)
 const authLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000,
@@ -54,12 +56,30 @@ const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
 const courseRoutes_1 = __importDefault(require("./routes/courseRoutes"));
 const enrollmentRoutes_1 = __importDefault(require("./routes/enrollmentRoutes"));
 const instructorRoutes_1 = __importDefault(require("./routes/instructorRoutes"));
+const studentRoutes_1 = __importDefault(require("./routes/studentRoutes"));
+const discussionRoutes_1 = __importDefault(require("./routes/discussionRoutes"));
+const notificationRoutes_1 = __importDefault(require("./routes/notificationRoutes"));
+const messageRoutes_1 = __importDefault(require("./routes/messageRoutes"));
+const quizRoutes_1 = __importDefault(require("./routes/quizRoutes"));
+const signatureRoutes_1 = __importDefault(require("./routes/signatureRoutes"));
+const certificateRoutes_1 = __importDefault(require("./routes/certificateRoutes"));
+const paymentRoutes_1 = __importDefault(require("./routes/paymentRoutes"));
+const searchRoutes_1 = __importDefault(require("./routes/searchRoutes"));
 // Routes — auth routes have stricter rate limits
 app.use("/api/auth", authLimiter, authRoutes_1.default);
 app.use("/api/dashboard", apiLimiter, dashboardRoutes_1.default);
 app.use("/api/courses", apiLimiter, courseRoutes_1.default);
 app.use("/api/enrollments", apiLimiter, enrollmentRoutes_1.default);
 app.use("/api/instructor", apiLimiter, instructorRoutes_1.default);
+app.use("/api/student", apiLimiter, studentRoutes_1.default);
+app.use("/api", apiLimiter, discussionRoutes_1.default); // discussionRoutes contains its own prefix overrides (like /courses/:courseId/discussions)
+app.use("/api/notifications", apiLimiter, notificationRoutes_1.default);
+app.use("/api/messages", apiLimiter, messageRoutes_1.default);
+app.use("/api/quizzes", apiLimiter, quizRoutes_1.default);
+app.use("/api/signatures", apiLimiter, signatureRoutes_1.default);
+app.use("/api/certificates", apiLimiter, certificateRoutes_1.default);
+app.use("/api/payments", paymentRoutes_1.default); // Prefix handles its own auth/raw-body as needed
+app.use("/api/search", apiLimiter, searchRoutes_1.default);
 // Basic Health Check
 app.get("/api/health", (req, res) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });

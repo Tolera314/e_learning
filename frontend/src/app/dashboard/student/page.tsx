@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -10,9 +11,11 @@ import {
   Bell,
   MessageSquare,
   FileText,
-  HelpCircle
+  HelpCircle,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
+import api from "@/lib/api";
 
 const STATS = [
   { label: "Enrolled Courses", value: "8", icon: <BookOpen className="text-blue-500" />, color: "bg-blue-50 dark:bg-blue-900/10" },
@@ -29,6 +32,41 @@ const ACTIVITIES = [
 ];
 
 export default function StudentDashboard() {
+  const [summary, setSummary] = useState<any>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const [sumRes, actRes] = await Promise.all([
+          api.get("/student/dashboard/summary"),
+          api.get("/student/dashboard/activity")
+        ]);
+        setSummary(sumRes.data);
+        setActivities(actRes.data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard summary:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 size={40} className="text-emerald-500 animate-spin" />
+    </div>
+  );
+
+  const stats = [
+    { label: "Enrolled Courses", value: summary?.enrolledCourses || "0", icon: <BookOpen className="text-blue-500" />, color: "bg-blue-50 dark:bg-blue-900/10" },
+    { label: "Completed Lessons", value: summary?.completedLessons || "0", icon: <CheckCircle2 className="text-emerald-500" />, color: "bg-emerald-50 dark:bg-emerald-900/10" },
+    { label: "Learning Streak", value: summary?.learningStreak || "0 Days", icon: <Flame className="text-orange-500" />, color: "bg-orange-50 dark:bg-orange-900/10" },
+    { label: "Quiz Avg Score", value: summary?.quizAvgScore || "0%", icon: <BarChart3 className="text-purple-500" />, color: "bg-purple-50 dark:bg-purple-900/10" },
+  ];
+
   return (
     <div className="max-w-7xl mx-auto space-y-10">
       <header>
@@ -38,7 +76,7 @@ export default function StudentDashboard() {
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-         {STATS.map((stat, i) => (
+         {stats.map((stat, i) => (
            <motion.div 
              key={i} 
              whileHover={{ y: -5 }}
@@ -59,6 +97,7 @@ export default function StudentDashboard() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                <Play size={20} className="text-emerald-600" /> Continue Learning
             </h2>
+            {/* For now keeping the featured course static as we'd need a "last watched" endpoint to make it dynamic */}
             <div className="bg-white dark:bg-[#111] p-6 sm:p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row gap-8 items-center group cursor-pointer hover:border-emerald-500 transition-all">
                <div className="w-full sm:w-48 h-32 bg-gray-100 dark:bg-gray-800 rounded-[2rem] overflow-hidden relative shrink-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 to-blue-600/20 flex items-center justify-center">
@@ -110,7 +149,12 @@ export default function StudentDashboard() {
                <Bell size={20} className="text-blue-600" /> Recent Activity
             </h2>
             <div className="bg-white dark:bg-[#111] p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
-               {ACTIVITIES.map((activity, i) => (
+               {activities.length === 0 ? (
+                 <div className="text-center py-10 text-gray-400 text-sm italic">
+                   No recent activity captured.
+                 </div>
+               ) : (
+                 activities.map((activity, i) => (
                   <div key={i} className="flex gap-4 items-start pb-6 border-b border-gray-50 last:border-0 dark:border-gray-800">
                      <div className={`p-3 rounded-2xl shrink-0 ${
                         activity.type === 'quiz' ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/20' : 
@@ -123,13 +167,16 @@ export default function StudentDashboard() {
                          activity.type === 'announcement' ? <Bell size={20} /> : 
                          <MessageSquare size={20} />}
                      </div>
-                     <div>
+                     <div className="flex-1">
                         <p className="text-sm font-bold text-gray-900 dark:text-white">{activity.title}</p>
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">{activity.result}</p>
-                        <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase tracking-widest">{activity.time}</p>
+                        {activity.result && <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">{activity.result}</p>}
+                        <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase tracking-widest">
+                           {new Date(activity.time).toLocaleDateString()}
+                        </p>
                      </div>
                   </div>
-               ))}
+                 ))
+               )}
                <button className="w-full py-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl text-sm font-bold text-gray-500 hover:text-emerald-600 transition-all">View All Activity</button>
             </div>
          </div>

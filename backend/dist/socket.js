@@ -4,10 +4,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSocketServer = initSocketServer;
+exports.getSocketServer = getSocketServer;
 const socket_io_1 = require("socket.io");
 const chatService_1 = require("./services/chatService");
 const jwt_1 = require("./utils/jwt");
 const logger_1 = __importDefault(require("./utils/logger"));
+let ioInstance = null;
 function initSocketServer(httpServer) {
     const io = new socket_io_1.Server(httpServer, {
         cors: {
@@ -17,6 +19,7 @@ function initSocketServer(httpServer) {
         },
         transports: ['websocket', 'polling'],
     });
+    ioInstance = io;
     chatService_1.chatService.setSocketServer(io);
     // Auth middleware for WebSocket connections
     io.use((socket, next) => {
@@ -49,6 +52,19 @@ function initSocketServer(httpServer) {
         socket.on('session:leave', (sessionId) => {
             socket.leave(`session:${sessionId}`);
         });
+        // Course room subscriptions for Discussions
+        socket.on('course:join', (courseId) => {
+            socket.join(`course_${courseId}`);
+            logger_1.default.debug({ userId: user.id, courseId }, 'User joined course room');
+        });
+        socket.on('course:leave', (courseId) => {
+            socket.leave(`course_${courseId}`);
+        });
+        // Global User Private Room
+        socket.on('user:join', () => {
+            socket.join(`user:${user.id}`);
+            logger_1.default.debug({ userId: user.id }, 'User joined private socket room');
+        });
         // Send a chat message
         socket.on('chat:send', async (data) => {
             if (!data.sessionId || !data.message?.trim())
@@ -76,4 +92,7 @@ function initSocketServer(httpServer) {
         });
     });
     return io;
+}
+function getSocketServer() {
+    return ioInstance;
 }
