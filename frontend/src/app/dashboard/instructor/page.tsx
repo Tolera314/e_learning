@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
+import { toast } from "react-hot-toast";
+import Link from "next/link";
 
 const StatsCard = ({ icon, label, value, color, trend }: any) => (
   <motion.div 
@@ -63,6 +65,7 @@ export default function InstructorDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isGoingLive, setIsGoingLive] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,6 +85,20 @@ export default function InstructorDashboard() {
     fetchData();
   }, []);
 
+  const handleGoLive = async () => {
+    try {
+      setIsGoingLive(true);
+      const { data } = await api.post("/instructor/go-live");
+      toast.success(data.message || "You are now LIVE!");
+      // Redirect to the live session or open it in a new tab
+      window.open(`/dashboard/instructor/live/${data.liveSessionId}`, "_blank");
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to start live session");
+    } finally {
+      setIsGoingLive(false);
+    }
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <Loader2 size={40} className="text-emerald-500 animate-spin" />
@@ -90,21 +107,40 @@ export default function InstructorDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto pb-10">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back, Instructor!</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-2">Here's what's happening with your courses today.</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <button className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all">
-              <Plus size={20} />
+      <section className="mb-10">
+        <h1 className="text-3xl font-black text-gray-900 dark:text-white font-outfit tracking-tight">
+          Welcome back, {stats?.instructorName || "Instructor"}!
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Keep track of your courses and student engagement.</p>
+        
+        <div className="flex flex-wrap items-center gap-3 mt-6">
+           {stats?.isLive ? (
+              <button 
+                onClick={() => window.open(`/dashboard/instructor/live/${stats.activeLiveSessionId}`, "_blank")}
+                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 hover:bg-red-700 transition-all animate-pulse text-xs"
+              >
+                 <Video size={18} />
+                 Currently Live
+              </button>
+           ) : (
+              <button 
+                onClick={handleGoLive}
+                disabled={isGoingLive}
+                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-700 transition-all disabled:opacity-50 text-xs"
+              >
+                 {isGoingLive ? <Loader2 size={18} className="animate-spin" /> : <Video size={18} />}
+                 Go Live Now
+              </button>
+           )}
+           <Link href="/dashboard/instructor/courses/create" className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all text-xs">
+              <Plus size={18} />
               Create Course
-           </button>
-           <button className="p-3 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-xl text-gray-500 hover:text-emerald-600 transition-colors">
-              <Calendar size={20} />
+           </Link>
+           <button className="p-3 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-xl text-gray-500 hover:text-emerald-600 transition-colors shadow-sm">
+              <Calendar size={18} />
            </button>
         </div>
-      </header>
+      </section>
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -140,7 +176,7 @@ export default function InstructorDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
          {/* RECENT ACTIVITY */}
          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800">
+            <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 min-h-[400px]">
               <div className="flex items-center justify-between mb-8">
                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Activity</h2>
                  <button className="text-sm font-bold text-emerald-600 hover:dark:text-emerald-400">View All</button>
@@ -163,74 +199,45 @@ export default function InstructorDashboard() {
                  )}
               </div>
             </div>
-
-            {/* UPCOMING SESSIONS */}
-            <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center justify-between mb-8">
-                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Upcoming Live Classes</h2>
-                 <button className="text-sm font-bold text-emerald-600 hover:dark:text-emerald-400">Schedule New</button>
-              </div>
-              <div className="space-y-4">
-                 {[
-                   { title: "Advanced Calculus Q&A", time: "Tomorrow, 4:00 PM", course: "Grade 12 Mathematics" },
-                   { title: "Exam Prep: Physics Paper 1", time: "Oct 12, 10:00 AM", course: "Grade 12 Physics" }
-                 ].map((session, i) => (
-                   <div key={i} className="flex items-center gap-6 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
-                      <div className="hidden sm:flex flex-col items-center justify-center bg-white dark:bg-gray-900 w-16 h-16 rounded-xl border border-gray-200 dark:border-gray-800">
-                         <Calendar size={20} className="text-emerald-600 mb-1" />
-                         <span className="text-[10px] font-bold uppercase">{session.time.split(',')[0]}</span>
-                      </div>
-                      <div className="flex-1">
-                         <h3 className="font-bold text-gray-900 dark:text-white">{session.title}</h3>
-                         <p className="text-xs text-gray-500 mt-1">{session.course} • {session.time}</p>
-                      </div>
-                      <button className="px-5 py-2.5 bg-gray-900 text-white dark:bg-white dark:text-black rounded-lg text-xs font-bold hover:bg-emerald-600 dark:hover:bg-emerald-400 dark:hover:text-black transition-colors">
-                         Join Link
-                      </button>
-                   </div>
-                 ))}
-              </div>
-            </div>
          </div>
 
-         {/* QUICK ACTIONS & STATS */}
-         <div className="space-y-8">
-            <div className="bg-emerald-600 p-8 rounded-3xl text-white shadow-xl shadow-emerald-500/20 relative overflow-hidden group">
-               <div className="absolute -right-10 -bottom-10 opacity-20 group-hover:scale-110 transition-transform duration-700">
-                  <Video size={200} />
-               </div>
-               <h2 className="text-2xl font-bold mb-4">Start Teaching</h2>
-               <p className="text-emerald-100 text-sm mb-6 leading-relaxed">Ready to share your knowledge? Upload your latest lesson or start a live session.</p>
-               <div className="space-y-3 relative z-10">
-                  <button className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl font-bold transition-all border border-white/20">
-                     Upload Video Lesson <ChevronRight size={18} />
-                  </button>
-                  <button className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl font-bold transition-all border border-white/20">
-                     Create Assignment <ChevronRight size={18} />
-                  </button>
-               </div>
-            </div>
-
-            <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800">
-               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Current Progress</h2>
-               <div className="space-y-6">
-                  <div>
-                     <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                        <span>Verified Status</span>
-                        <span className="text-emerald-600">Active</span>
-                     </div>
-                     <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 w-[100%]" />
-                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
-                     <CheckCircle2 className="text-blue-600" size={24} />
-                     <div className="flex-1">
-                        <p className="text-xs font-bold text-blue-900 dark:text-blue-400 uppercase tracking-tighter">Profile 100% Complete</p>
-                        <p className="text-[10px] text-blue-700 dark:text-blue-500 font-medium">Verified for Teaching.</p>
-                     </div>
-                  </div>
-               </div>
+         {/* UPCOMING SESSIONS */}
+         <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 h-full">
+              <div className="flex items-center justify-between mb-8">
+                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Upcoming Live Sessions</h2>
+                 <button className="text-sm font-bold text-emerald-600 hover:dark:text-emerald-400">Schedule</button>
+              </div>
+              <div className="space-y-4">
+                 {stats?.upcomingSessions && stats.upcomingSessions.length > 0 ? (
+                    stats.upcomingSessions.map((session: any, i: number) => (
+                      <div key={i} className="flex flex-col gap-3 p-5 rounded-3xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+                         <div className="flex items-center gap-4">
+                           <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-900 w-14 h-14 rounded-2xl border border-gray-200 dark:border-gray-800 shrink-0">
+                              <Calendar size={18} className="text-emerald-600 mb-1" />
+                              <span className="text-[9px] font-bold uppercase">{new Date(session.time).toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                           </div>
+                           <div>
+                              <h3 className="font-bold text-gray-900 dark:text-white leading-tight">{session.title}</h3>
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mt-1">{session.course}</p>
+                           </div>
+                         </div>
+                         <button className="w-full mt-2 py-3 bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl text-xs font-bold shadow-lg hover:bg-emerald-600 dark:hover:bg-emerald-400 dark:hover:text-black transition-colors">
+                            Prepare Session
+                         </button>
+                      </div>
+                    ))
+                 ) : (
+                    <div className="mt-4 p-10 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 text-center flex flex-col items-center justify-center">
+                       <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">No Scheduled Lives</p>
+                       <p className="text-[10px] text-gray-400 mt-2">Your calendar is currently clear.</p>
+                    </div>
+                 )}
+                 
+                 <div className="mt-4 p-5 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 text-center flex flex-col items-center justify-center">
+                    <p className="text-xs text-gray-400 font-medium mb-2">No more sessions this week.</p>
+                 </div>
+              </div>
             </div>
          </div>
       </div>

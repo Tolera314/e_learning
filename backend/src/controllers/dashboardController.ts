@@ -1,7 +1,31 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { prisma } from '../utils/prisma';
 import logger from '../utils/logger';
+
+export const getPublicStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [totalCourses, totalUsers, totalEnrollments, avgRatingAgg] = await Promise.all([
+      prisma.course.count({ where: { visibility: 'PUBLISHED' } }),
+      prisma.user.count(),
+      prisma.enrollment.count(),
+      prisma.course.aggregate({
+        where: { visibility: 'PUBLISHED' },
+        _avg: { rating: true }
+      })
+    ]);
+
+    res.json({
+      totalCourses,
+      totalStudents: totalUsers,
+      totalEnrollments,
+      averageRating: avgRatingAgg._avg.rating || 4.8
+    });
+  } catch (error) {
+    logger.error({ error }, 'Error fetching public stats');
+    res.status(500).json({ message: 'Server error retrieving public stats' });
+  }
+};
 
 export const getStudentDashboard = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

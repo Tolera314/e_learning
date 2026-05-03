@@ -9,7 +9,7 @@ export default function InstructorCTA() {
     <section className="py-24 bg-gray-50 dark:bg-[#111]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-emerald-600 to-teal-800 dark:from-emerald-900/80 dark:to-[#0a1f16] border border-emerald-500/20">
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1544717305-2782549b5136?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center mix-blend-overlay opacity-20"></div>
+          <div className="absolute inset-0 bg-[url('/images/instructor_cta_bg.jpg')] bg-cover bg-center mix-blend-overlay opacity-20"></div>
           
           <div className="relative grid lg:grid-cols-2 gap-12 items-center p-12 md:p-16">
             <motion.div

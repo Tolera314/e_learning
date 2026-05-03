@@ -195,7 +195,7 @@ export default function DiscussionThreadView({ threadId, courseId, userRole, onB
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
                   {reply.author.avatar ? (
-                    <img src={reply.author.avatar} alt="" className="w-full h-full object-cover" />
+                    <img src={reply.author.avatar} alt="" className="w-full h-full object-cover" loading="lazy" />
                   ) : <User size={12} className="text-gray-500" />}
                 </div>
                 <span className={`text-sm font-medium ${isInstructor ? 'text-secondary-600 dark:text-secondary-400' : 'text-gray-900 dark:text-gray-100'}`}>
@@ -318,7 +318,7 @@ export default function DiscussionThreadView({ threadId, courseId, userRole, onB
           
           <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-100 dark:border-gray-800">
             <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex items-center justify-center">
-               {thread.author.avatar ? <img src={thread.author.avatar} alt="" className="w-full h-full object-cover" /> : <User size={20} className="text-gray-500" />}
+               {thread.author.avatar ? <img src={thread.author.avatar} alt="" className="w-full h-full object-cover" loading="lazy" /> : <User size={20} className="text-gray-500" />}
             </div>
             <div>
               <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm">

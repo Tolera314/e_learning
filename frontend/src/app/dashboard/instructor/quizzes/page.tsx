@@ -34,6 +34,7 @@ export default function InstructorQuizzesPage() {
 
   useEffect(() => {
     fetchCourses();
+    fetchQuizzes();
   }, []);
 
   const fetchCourses = async () => {
@@ -42,6 +43,18 @@ export default function InstructorQuizzesPage() {
       setCourses(data.courses || data);
     } catch (err) {
       console.error("Failed to fetch courses", err);
+    }
+  };
+
+  const fetchQuizzes = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get('/quizzes/instructor');
+      setQuizzes(data);
+    } catch (err) {
+      console.error("Failed to fetch quizzes", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -109,6 +122,7 @@ export default function InstructorQuizzesPage() {
         questions: [{ text: "", points: 1, options: [{ text: "", isCorrect: true }, { text: "", isCorrect: false }] }]
       });
       setSelectedCourseId("");
+      fetchQuizzes();
     } catch (error) {
       console.error("Failed to save quiz", error);
       alert("Error saving quiz. Make sure all fields are filled.");
@@ -332,20 +346,39 @@ export default function InstructorQuizzesPage() {
 
       {/* Simplified Dashboard Grid for Quizzes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* If we had a list of existing quizzes, we'd map them here */}
-        <div className="col-span-full py-20 text-center bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-gray-800 border-dashed">
-          <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
-            <Plus size={32} />
+        {loading ? (
+           Array.from({length:3}).map((_,i) => <div key={i} className="h-48 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-3xl" />)
+        ) : quizzes.map(quiz => (
+           <div key={quiz.id} className="bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 p-6 rounded-3xl hover:border-emerald-400 transition-colors shadow-sm group">
+              <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-2xl flex items-center justify-center mb-4">
+                 <BookOpen size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 group-hover:text-emerald-500 transition-colors">{quiz.title}</h3>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 truncate">{quiz.lesson?.module?.course?.title || "Course"}</p>
+              
+              <div className="flex items-center gap-4 text-sm font-bold text-gray-500">
+                 <span>{quiz._count?.questions || 0} Qs</span>
+                 <span>•</span>
+                 <span>{quiz.durationMinutes || 0} mins</span>
+              </div>
+           </div>
+        ))}
+
+        {!loading && quizzes.length === 0 && (
+          <div className="col-span-full py-20 text-center bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-gray-800 border-dashed">
+            <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
+              <Plus size={32} />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Quizzes Created</h3>
+            <p className="text-gray-500 max-w-sm mx-auto mb-8">Start by creating your first assessment to measure student understanding.</p>
+            <button 
+              onClick={() => setIsCreating(true)}
+              className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity"
+            >
+              Get Started
+            </button>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Quizzes Created</h3>
-          <p className="text-gray-500 max-w-sm mx-auto mb-8">Start by creating your first assessment to measure student understanding.</p>
-          <button 
-            onClick={() => setIsCreating(true)}
-            className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity"
-          >
-            Get Started
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

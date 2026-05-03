@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const signupSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
@@ -23,6 +24,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function Signup() {
   const router = useRouter();
+  const { login } = useAuth();
   const [role, setRole] = useState<"STUDENT" | "INSTRUCTOR" | null>(null);
   const [step, setStep] = useState(0); // 0: Role, 1: Details, 2: OTP, 3: Success
   const [loading, setLoading] = useState(false);
@@ -67,7 +69,10 @@ export default function Signup() {
       setUserId(data.userId);
       setStep(2);
     } catch (err: any) {
-      setGlobalError(err.message);
+      const serverMsg = err.response?.data?.message;
+      const zodErrors = err.response?.data?.errors;
+      const displayMsg = serverMsg || (zodErrors ? zodErrors.map((e: any) => e.message).join(", ") : null) || err.message || "Registration failed";
+      setGlobalError(displayMsg);
     } finally {
       setLoading(false);
     }
@@ -91,10 +96,8 @@ export default function Signup() {
 
       const data = response.data;
 
-      // Success: Store tokens
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("refreshToken", data.refreshToken);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Success: Init session in context
+      login(data.token, data.refreshToken || "", data.user);
 
       if (!data.user.onboardingCompleted) {
         setStep(3); // Success step with "Start Onboarding" button
@@ -102,7 +105,10 @@ export default function Signup() {
         router.push(`/dashboard/${data.user.role.toLowerCase()}`);
       }
     } catch (err: any) {
-      setGlobalError(err.message);
+      const serverMsg = err.response?.data?.message;
+      const zodErrors = err.response?.data?.errors;
+      const displayMsg = serverMsg || (zodErrors ? zodErrors.map((e: any) => e.message).join(", ") : null) || err.message || "Verification failed";
+      setGlobalError(displayMsg);
     } finally {
       setLoading(false);
     }
@@ -121,7 +127,7 @@ export default function Signup() {
   return (
     <AuthLayout
       imagePosition="left"
-      imageUrl="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&q=80"
+      imageUrl="/images/signup_bg.jpg"
       imageQuote="Education is the passport to the future, for tomorrow belongs to those who prepare for it today."
       imageAuthor="Malcolm X"
     >

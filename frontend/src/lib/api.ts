@@ -45,6 +45,14 @@ api.interceptors.response.use(
                 return Promise.reject(err);
             }
         }
+        
+        // Dispatch custom global event for unhandled server / network errors
+        if (typeof window !== "undefined") {
+            const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "API Error";
+            const event = new CustomEvent("api-error", { detail: { message: errorMsg, status: error.response?.status } });
+            window.dispatchEvent(event);
+        }
+
         return Promise.reject(error);
     }
 );

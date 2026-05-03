@@ -37,7 +37,7 @@ export const getCourseDiscussions = async (req: Request, res: Response) => {
   }
 };
 
-export const createThread = async (req: any, res: Response) => {
+export const createDiscussionThread = async (req: any, res: Response) => {
   try {
     const courseId = String(req.params.courseId);
     const { title, content } = req.body;
@@ -107,6 +107,31 @@ export const getThreadDetails = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get thread error:", error);
     res.status(500).json({ error: "Failed to fetch thread details" });
+  }
+};
+
+export const getThreadReplies = async (req: Request, res: Response) => {
+  try {
+    const threadId = String(req.params.threadId);
+    const replies = await prisma.discussionReply.findMany({
+      where: { threadId, isDeleted: false, parentId: null },
+      include: {
+        author: { select: { id: true, name: true, avatar: true, role: true } },
+        reactions: { select: { userId: true, type: true } },
+        children: {
+          where: { isDeleted: false },
+          include: {
+            author: { select: { id: true, name: true, avatar: true, role: true } },
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.status(200).json(replies);
+  } catch (error) {
+    console.error("Fetch replies error:", error);
+    res.status(500).json({ error: "Failed to fetch thread replies" });
   }
 };
 

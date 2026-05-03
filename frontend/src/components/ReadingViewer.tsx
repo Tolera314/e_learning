@@ -17,12 +17,25 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function ReadingViewer() {
+interface ReadingViewerProps {
+  content: string;
+  onComplete?: () => void;
+}
+
+export default function ReadingViewer({ content, onComplete }: ReadingViewerProps) {
   const [activeTool, setActiveTool] = useState<"hand" | "highlight" | "comment">("hand");
-  const [showDiscussion, setShowDiscussion] = useState(true);
+  const [showDiscussion, setShowDiscussion] = useState(false);
+  const [hasCompleted, setHasCompleted] = useState(false);
   const [annotations, setAnnotations] = useState([
-     { id: "a1", text: "Important: Limit definition of the derivative.", color: "bg-yellow-200/50" }
+     { id: "a1", text: "Important: Key concept identified.", color: "bg-yellow-200/50" }
   ]);
+
+  const handleComplete = () => {
+    if (!hasCompleted && onComplete) {
+      setHasCompleted(true);
+      onComplete();
+    }
+  };
 
   return (
     <div className="flex h-full bg-gray-100 dark:bg-black/40 rounded-[2.5rem] overflow-hidden border-8 border-white dark:border-white/5 shadow-2xl">
@@ -57,9 +70,9 @@ export default function ReadingViewer() {
       <div className="flex-1 flex flex-col bg-white/50 dark:bg-transparent overflow-hidden">
         {/* VIEW CONTROLS */}
         <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-[#111]">
-           <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
               <FileText className="text-emerald-500" />
-              <span className="text-sm font-bold text-gray-900 dark:text-white">Chapter 2.2 - Rules of Differentiation.pdf</span>
+              <span className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Lesson Material</span>
            </div>
            <div className="flex items-center gap-2">
               <button className="p-2 text-gray-400 hover:text-emerald-600"><ChevronLeft size={18} /></button>
@@ -77,25 +90,23 @@ export default function ReadingViewer() {
         {/* PAGE RENDERER */}
         <div className="flex-1 overflow-y-auto p-12 custom-scrollbar bg-gray-50 dark:bg-transparent">
            <div className="max-w-3xl mx-auto bg-white dark:bg-[#111] shadow-2xl rounded-2xl p-16 min-h-[1200px] relative">
-              <h1 className="text-3xl font-black mb-8 text-gray-900 dark:text-white">2.2 Rules of Differentiation</h1>
-              <div className="space-y-6 text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
-                 <p>In calculus, the rules of differentiation allow us to find the derivative of a function without using the limit definition every time. These rules are essential for efficient problem-solving in physics, engineering, and data science.</p>
-                 
-                 <div className="p-10 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-3xl border-2 border-emerald-500/20 my-10 relative">
-                    <span className="absolute -top-3 left-6 px-3 py-1 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-full">The Power Rule</span>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white italic">"If f(x) = x^n, then f'(x) = nx^(n-1) for any real number n."</p>
-                    {/* Mock Highlight */}
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="absolute inset-0 bg-yellow-200/20 mix-blend-multiply dark:mix-blend-overlay pointer-events-none rounded-3xl"
-                    />
-                 </div>
+              <div 
+                className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-400 leading-relaxed font-medium"
+                dangerouslySetInnerHTML={{ __html: content }}
+              />
 
-                 <p>For example, if f(x) = x³, then applying the power rule gives f'(x) = 3x². This simple rule covers a vast range of polynomial functions.</p>
-                 
-                 <h2 className="text-xl font-black text-gray-900 dark:text-white mt-12 mb-4">The Constant Rule</h2>
-                 <p>The derivative of any constant function is always zero. This makes physical sense because a constant value has a zero rate of change.</p>
+              <div className="mt-20 pt-10 border-t border-gray-100 dark:border-gray-800 text-center">
+                 <button
+                   onClick={handleComplete}
+                   disabled={hasCompleted}
+                   className={`px-10 py-5 rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] transition-all ${
+                     hasCompleted 
+                     ? 'bg-emerald-50 text-emerald-600' 
+                     : 'bg-emerald-600 text-white shadow-[0_20px_50px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95'
+                   }`}
+                 >
+                    {hasCompleted ? 'Lesson Completed' : 'Mark as Completed'}
+                 </button>
               </div>
 
               {/* Float Comment Bubble */}

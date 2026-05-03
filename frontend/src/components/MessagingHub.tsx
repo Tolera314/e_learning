@@ -153,7 +153,7 @@ export default function MessagingHub() {
               >
                 <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center font-bold relative shrink-0">
                   {conv.avatar ? (
-                    <img src={conv.avatar} alt={conv.title} className="w-full h-full rounded-full object-cover" />
+                    <img src={conv.avatar} alt={conv.title} className="w-full h-full rounded-full object-cover" loading="lazy" />
                   ) : (
                     <UserCircle size={28} />
                   )}

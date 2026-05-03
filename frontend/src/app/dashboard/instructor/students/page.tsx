@@ -5,103 +5,222 @@ import {
   MessageSquare, 
   MoreVertical, 
   TrendingUp, 
-  Filter
+  Filter,
+  ChevronRight,
+  CheckCircle2,
+  Video,
+  HelpCircle,
+  Star
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import SlidePanel from "@/components/SlidePanel";
+import api from "@/lib/api";
 
-const STUDENTS = [
-  { id: "1", name: "Abebe Kebede", email: "abebe@example.com", course: "Advanced Calculus", progress: 85, score: "92%", date: "Oct 2026" },
-  { id: "2", name: "Sara Tesfaye", email: "sara@example.com", course: "Physics Fundamentals", progress: 40, score: "88%", date: "Sept 2026" },
-  { id: "3", name: "Dawit Haile", email: "dawit@example.com", course: "Advanced Calculus", progress: 95, score: "95%", date: "Oct 2026" },
-  { id: "4", name: "Tigist Bekele", email: "tigist@example.com", course: "Chemistry G11", progress: 12, score: "78%", date: "Nov 2026" },
-  { id: "5", name: "Samuel Girma", email: "samuel@example.com", course: "Maths G10", progress: 60, score: "84%", date: "Oct 2026" },
-];
+
 
 export default function StudentManagement() {
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get("/instructor/students");
+      setStudents(data);
+    } catch (err) {
+      console.error("Failed to fetch students", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = students.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.course.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="max-w-7xl mx-auto">
-      <header className="mb-10">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Student Management</h1>
-        <p className="text-gray-500 mt-2">Track student progress, view performance, and send feedback.</p>
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Students</h1>
+          <p className="text-gray-500 mt-2">Track progress, view activity, and engage with your learners.</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-xl">
+          <TrendingUp size={16} /> {students.length} Total Students
+        </div>
       </header>
 
       {/* SEARCH & FILTERS */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
-         <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search students by name or course..." 
-              className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-gray-900 dark:text-white"
-            />
-         </div>
-         <button className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl text-gray-600 dark:text-gray-300 font-bold">
-            <Filter size={18} /> Filter
-         </button>
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or course..."
+            className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-gray-900 dark:text-white"
+          />
+        </div>
+        <button className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-50 transition-colors">
+          <Filter size={18} /> Filter by Course
+        </button>
       </div>
 
       {/* STUDENT TABLE */}
       <div className="bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-         <div className="overflow-x-auto">
-            <table className="w-full text-left">
-               <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                     <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Student Name</th>
-                     <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Enrolled Course</th>
-                     <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Progress</th>
-                     <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Avg. Score</th>
-                     <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                  {STUDENTS.map((student) => (
-                     <tr key={student.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                        <td className="px-8 py-6">
-                           <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center font-bold text-emerald-600">
-                                 {student.name[0]}
-                              </div>
-                              <div>
-                                 <p className="font-bold text-gray-900 dark:text-white">{student.name}</p>
-                                 <p className="text-[10px] text-gray-500">{student.email}</p>
-                              </div>
-                           </div>
-                        </td>
-                        <td className="px-8 py-6">
-                           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{student.course}</span>
-                           <p className="text-[10px] text-gray-500 mt-1">Since {student.date}</p>
-                        </td>
-                        <td className="px-8 py-6">
-                           <div className="w-32">
-                              <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1">
-                                 <span>{student.progress}%</span>
-                              </div>
-                              <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                 <div className={`h-full ${student.progress > 80 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${student.progress}%` }} />
-                              </div>
-                           </div>
-                        </td>
-                        <td className="px-8 py-6">
-                           <div className="flex items-center gap-2">
-                              <TrendingUp size={14} className="text-emerald-500" />
-                              <span className="text-sm font-bold text-gray-900 dark:text-white">{student.score}</span>
-                           </div>
-                        </td>
-                        <td className="px-8 py-6 text-right">
-                           <div className="flex items-center justify-end gap-2">
-                              <button className="p-2 text-gray-400 hover:text-emerald-600 transition-colors" title="Message Student">
-                                 <MessageSquare size={18} />
-                              </button>
-                              <button className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                                 <MoreVertical size={18} />
-                              </button>
-                           </div>
-                        </td>
-                     </tr>
-                  ))}
-               </tbody>
-            </table>
-         </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20">
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Student</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Enrolled Course</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Progress</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Avg. Score</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Last Active</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400 text-right">Details</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+              {filtered.map((student) => (
+                <tr key={student.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center font-bold text-emerald-600 text-sm overflow-hidden">
+                        {student.avatar ? <img src={student.avatar} alt="" className="w-full h-full object-cover" /> : student.name[0]}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-white">{student.name}</p>
+                        <p className="text-[10px] text-gray-500">{student.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{student.course}</span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="w-28">
+                      <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5">
+                        <span>{student.progress}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${student.progress > 80 ? 'bg-emerald-500' : student.progress > 40 ? 'bg-blue-500' : 'bg-amber-500'}`}
+                          style={{ width: `${student.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="text-sm font-bold text-emerald-600">{student.quizAvg}</span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="text-xs font-medium text-gray-500">{student.lastActive}</span>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Message">
+                        <MessageSquare size={18} />
+                      </button>
+                      <button
+                        onClick={() => setSelectedStudent(student)}
+                        className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-colors"
+                      >
+                        Details <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && (
+          <div className="p-10 text-center text-gray-400">No students matching your search.</div>
+        )}
       </div>
+
+      {/* STUDENT DETAIL SLIDE PANEL */}
+      <SlidePanel
+        isOpen={!!selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+        title={selectedStudent?.name || "Student Details"}
+        subtitle={selectedStudent?.email}
+      >
+        {selectedStudent && (
+          <div className="space-y-8">
+            {/* Avatar & Course Chip */}
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 text-2xl font-black overflow-hidden">
+                {selectedStudent.avatar ? <img src={selectedStudent.avatar} alt="" className="w-full h-full object-cover" /> : selectedStudent.name[0]}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedStudent.name}</h3>
+                <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg">{selectedStudent.course}</span>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="p-5 bg-gray-50 dark:bg-gray-800/30 rounded-2xl">
+              <div className="flex justify-between text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
+                <span>Overall Progress</span>
+                <span className="text-emerald-600">{selectedStudent.progress}%</span>
+              </div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full">
+                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${selectedStudent.progress}%` }} />
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Videos Watched", value: selectedStudent.videosWatched || 0, icon: Video },
+                { label: "Quizzes Done", value: selectedStudent.quizzesDone || 0, icon: HelpCircle },
+                { label: "Avg Score", value: selectedStudent.quizAvg || "N/A", icon: Star }
+              ].map((stat, i) => {
+                const Icon = stat.icon;
+                return (
+                  <div key={i} className="p-4 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl text-center">
+                    <Icon size={18} className="mx-auto mb-2 text-emerald-500" />
+                    <p className="text-lg font-black text-gray-900 dark:text-white">{stat.value}</p>
+                    <p className="text-[9px] uppercase font-bold text-gray-400 tracking-widest mt-1">{stat.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Milestones */}
+            <div>
+              <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">Completion Milestones</h4>
+              <div className="space-y-3">
+                {["Completed Introduction Module", "Passed Week 1 Quiz", "Submitted First Assignment"].map((m, i) => (
+                  <div key={i} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                    {m}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+              <MessageSquare size={18} /> Send Message to {selectedStudent.name.split(" ")[0]}
+            </button>
+          </div>
+        )}
+      </SlidePanel>
+
+      {loading && (
+        <div className="fixed inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center z-50">
+           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+        </div>
+      )}
     </div>
   );
 }

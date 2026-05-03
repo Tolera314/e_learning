@@ -53,6 +53,40 @@ export const createQuiz = async (req: AuthRequest, res: Response) => {
 };
 
 /**
+ * INSTRUCTOR: Get all Quizzes created by the instructor
+ */
+export const getMyQuizzes = async (req: AuthRequest, res: Response) => {
+  try {
+    const instructorId = req.user?.id;
+    const { courseId } = req.params;
+    if (!instructorId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const quizzes = await prisma.quiz.findMany({
+      where: {
+        lesson: { 
+          module: { 
+            course: { 
+              instructorId,
+              ...(courseId ? { id: courseId as string } : {})
+            } 
+          } 
+        }
+      },
+      include: {
+        lesson: { include: { module: { include: { course: true } } } },
+        _count: { select: { questions: true } },
+        questions: { include: { options: true } } // Include questions for the editor
+      }
+    });
+
+    res.status(200).json(quizzes);
+  } catch (error) {
+    console.error('Get instructor quizzes error:', error);
+    res.status(500).json({ error: 'Failed to get quizzes' });
+  }
+};
+
+/**
  * INSTRUCTOR/STUDENT: Get Quiz Details (Admin/Instructor get correct answers, students do not)
  */
 export const getQuiz = async (req: AuthRequest, res: Response) => {
@@ -66,14 +100,22 @@ export const getQuiz = async (req: AuthRequest, res: Response) => {
         questions: {
           include: {
             options: role === 'INSTRUCTOR' || role === 'ADMIN' 
-              ? true // full access
-              : { select: { id: true, text: true, questionId: true } } // Student access (no isCorrect)
+              ? true 
+              : { select: { id: true, text: true, questionId: true } }
           }
         }
       }
     });
 
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    // Expert Feature: Randomize questions and options for students to prevent cheating
+    if (role === 'STUDENT') {
+      quiz.questions = quiz.questions.sort(() => Math.random() - 0.5);
+      quiz.questions.forEach(q => {
+        q.options = q.options.sort(() => Math.random() - 0.5);
+      });
+    }
 
     res.status(200).json(quiz);
   } catch (error) {
@@ -83,73 +125,116 @@ export const getQuiz = async (req: AuthRequest, res: Response) => {
 };
 
 /**
- * STUDENT: Submit Quiz for Auto-Grading
+ * STUDENT: Submit Quiz for Auto-Grading & Detailed Feedback
  */
 export const submitQuiz = async (req: AuthRequest, res: Response) => {
   try {
     const studentId = (req.user as any)?.id;
-    const id = req.params.id as string; // Quiz ID
-    const { answers } = req.body; // Array of { questionId, selectedOptionId }
+    const id = req.params.id as string; 
+    const { answers } = req.body; 
 
     const quiz = await prisma.quiz.findUnique({
       where: { id },
-      include: { questions: { include: { options: true } } }
+      include: { 
+        questions: { 
+          include: { 
+            options: true 
+          } 
+        } 
+      }
     });
 
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
     let score = 0;
-    const answerRecords: any[] = [];
-    const questions = (quiz as any).questions || [];
+    const detailedResults = [];
+    const answerRecords = [];
+    const questions = quiz.questions || [];
 
-    // Auto grading
     for (const q of questions) {
       const studentAnswer = answers.find((a: any) => a.questionId === q.id);
-      if (!studentAnswer) continue;
-
-      const selectedOption = q.options.find((o: any) => o.id === studentAnswer.selectedOptionId);
-      const isCorrect = selectedOption?.isCorrect || false;
+      const selectedOptionId = studentAnswer?.selectedOptionId || null;
+      
+      const correctOption = q.options.find((o: any) => o.isCorrect);
+      const isCorrect = selectedOptionId === correctOption?.id;
 
       if (isCorrect) score += q.points;
 
-      answerRecords.push({
+      // Expert Feature: Return full context for "Review Mode"
+      detailedResults.push({
         questionId: q.id,
-        selectedOptionId: studentAnswer.selectedOptionId,
-        isCorrect
+        questionText: q.text,
+        selectedOptionId,
+        correctOptionId: correctOption?.id,
+        isCorrect,
+        explanation: q.explanation || "No explanation provided."
       });
+
+      if (selectedOptionId) {
+        answerRecords.push({
+          questionId: q.id,
+          selectedOptionId,
+          isCorrect
+        });
+      }
     }
 
-    const maxScore = questions.reduce((sum: number, q: any) => sum + q.points, 0);
-    const scorePercentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
+    const scorePercentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
+    const passed = scorePercentage >= quiz.passingScore;
 
     const submission = await (prisma as any).quizSubmission.create({
       data: {
         quizId: id,
         studentId,
-        score: scorePercentage, // Storing as percentage for standard passing calculation
+        score: scorePercentage,
         answers: {
           create: answerRecords
         }
-      },
-      include: { answers: true }
+      }
     });
 
-    // Mark lesson as visually completed if passing score reached
-    if (scorePercentage >= quiz.passingScore) {
-      await (prisma as any).lessonProgress.upsert({
-        where: {
-          studentId_lessonId: { studentId, lessonId: (quiz as any).lessonId }
-        },
+    // Mark lesson as completed if passed
+    if (passed) {
+      await prisma.lessonProgress.upsert({
+        where: { studentId_lessonId: { studentId, lessonId: quiz.lessonId } },
         update: { isCompleted: true },
-        create: { studentId, lessonId: (quiz as any).lessonId, isCompleted: true, watchTimeSeconds: 0 }
+        create: { studentId, lessonId: quiz.lessonId, isCompleted: true }
       });
+
+      // Update enrollment progress (Expert: triggering background recalculation)
+      const lesson = await prisma.lesson.findUnique({
+        where: { id: quiz.lessonId },
+        include: { module: { include: { course: true } } }
+      });
+
+      if (lesson) {
+        const courseId = lesson.module.courseId;
+        const [total, completed] = await Promise.all([
+          prisma.lesson.count({ where: { module: { courseId } } }),
+          prisma.lessonProgress.count({ where: { studentId, isCompleted: true, lesson: { module: { courseId } } } })
+        ]);
+        await prisma.enrollment.updateMany({
+          where: { studentId, courseId },
+          data: { progressPercent: total > 0 ? (completed / total) * 100 : 0 }
+        });
+      }
     }
 
+    // Log Activity
+    await (prisma as any).studentActivityLog.create({
+      data: {
+        studentId,
+        action: "SUBMIT_QUIZ",
+        metadata: JSON.stringify({ quizId: id, score: scorePercentage, passed })
+      }
+    });
+
     res.status(201).json({
-      submission,
+      submissionId: submission.id,
       score: scorePercentage,
-      passed: scorePercentage >= (quiz as any).passingScore,
-      maxScore
+      passed,
+      results: detailedResults 
     });
 
   } catch (error) {

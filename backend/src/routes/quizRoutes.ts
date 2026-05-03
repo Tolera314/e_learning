@@ -1,5 +1,5 @@
 import express from 'express';
-import { createQuiz, getQuiz, submitQuiz, getQuizSubmissions } from '../controllers/quizController';
+import { createQuiz, getQuiz, submitQuiz, getQuizSubmissions, getMyQuizzes } from '../controllers/quizController';
 import { protect, authorize } from '../middlewares/authMiddleware';
 import { checkSubscription } from '../middlewares/subscriptionMiddleware';
 
@@ -9,6 +9,8 @@ router.use(protect);
 
 // Instructor Routes
 router.post('/instructor', authorize('INSTRUCTOR', 'ADMIN'), createQuiz);
+router.get('/instructor', authorize('INSTRUCTOR', 'ADMIN'), getMyQuizzes);
+router.get('/instructor/course/:courseId', authorize('INSTRUCTOR', 'ADMIN'), getMyQuizzes);
 router.get('/instructor/:id/submissions', authorize('INSTRUCTOR', 'ADMIN'), getQuizSubmissions);
 
 // Shared/Student Routes (Subscription Required)

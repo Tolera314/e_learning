@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
+import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   GraduationCap,
   LayoutDashboard,
   BookOpen,
   Settings,
-  LogOut,
   Menu,
   PlusCircle,
   Video,
@@ -22,10 +21,23 @@ import {
   Trophy,
   CreditCard,
   UserCircle,
-  MessageSquare
+  MessageSquare,
+  Layers,
+  Activity,
+  FileSpreadsheet,
+  TrendingUp,
+  Percent,
+  Zap,
+  Shield,
+  History,
+  Database,
+  Heart
 } from "lucide-react";
 import Link from "next/link";
 import NotificationBell from "./NotificationBell";
+import UserMenu from "./UserMenu";
+import AuthGuard from "./AuthGuard";
+import { useAuth } from "@/context/AuthContext";
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -55,30 +67,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
   role: "student" | "instructor" | "admin";
 }) {
-  const router = useRouter();
+  const { user } = useAuth();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      router.push("/login");
-      return;
-    }
-    const parsedUser = JSON.parse(storedUser);
-    if (parsedUser.role.toLowerCase() !== role) {
-      router.push(`/dashboard/${parsedUser.role.toLowerCase()}`);
-      return;
-    }
-    setUser(parsedUser);
-  }, [role, router]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    router.push("/login");
-  };
 
   const navItems = {
     student: [
@@ -112,98 +103,125 @@ export default function DashboardLayout({
       { icon: <LifeBuoy size={20} />, label: "Support", href: "/dashboard/instructor/support" },
     ],
     admin: [
-      { icon: <LayoutDashboard size={20} />, label: "Admin Panel", href: "/dashboard/admin" },
-      { icon: <Users size={20} />, label: "Manage Users", href: "/dashboard/admin/users" },
-      { icon: <Settings size={20} />, label: "System Config", href: "/dashboard/admin/config" },
+      { type: "header", label: "Core Management" },
+      { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard/admin" },
+      { icon: <Users size={20} />, label: "User Management", href: "/dashboard/admin/users" },
+      { icon: <GraduationCap size={20} />, label: "Instructors", href: "/dashboard/admin/instructors" },
+      { icon: <BookOpen size={20} />, label: "Course Catalog", href: "/dashboard/admin/courses" },
+      { icon: <Layers size={20} />, label: "Categories", href: "/dashboard/admin/categories" },
+      
+      { type: "header", label: "Academic Ops" },
+      { icon: <Activity size={20} />, label: "Enrollments", href: "/dashboard/admin/enrollments" },
+      { icon: <Video size={20} />, label: "Live Classes", href: "/dashboard/admin/live-sessions" },
+      { icon: <FileSpreadsheet size={20} />, label: "Quizzes", href: "/dashboard/admin/quizzes" },
+      { icon: <Trophy size={20} />, label: "Certificates", href: "/dashboard/admin/certificates" },
+      
+      { type: "header", label: "Financial" },
+      { icon: <CreditCard size={20} />, label: "Payments", href: "/dashboard/admin/payments" },
+      { icon: <TrendingUp size={20} />, label: "Earnings", href: "/dashboard/admin/earnings" },
+      { icon: <Percent size={20} />, label: "Commission", href: "/dashboard/admin/commission" },
+      
+      { type: "header", label: "Engagement" },
+      { icon: <Bell size={20} />, label: "Announcements", href: "/dashboard/admin/notifications" },
+      { icon: <MessageSquare size={20} />, label: "Moderation", href: "/dashboard/admin/content-moderation" },
+      { icon: <Heart size={20} />, label: "Support & Feedback", href: "/dashboard/admin/support" },
+      
+      { type: "header", label: "System" },
+      { icon: <BarChart3 size={20} />, label: "Analytics", href: "/dashboard/admin/analytics" },
+      { icon: <Zap size={20} />, label: "Performance", href: "/dashboard/admin/performance" },
+      { icon: <Shield size={20} />, label: "Security", href: "/dashboard/admin/security" },
+      { icon: <History size={20} />, label: "Audit Logs", href: "/dashboard/admin/audit-logs" },
+      { icon: <Settings size={20} />, label: "System Config", href: "/dashboard/admin/settings" },
+      { icon: <Database size={20} />, label: "Backups", href: "/dashboard/admin/backups" },
     ],
   };
 
   if (!user) return null;
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-[#0a0a0a] flex overflow-hidden">
-      {/* Sidebar Mobile Overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          />
-        )}
-      </AnimatePresence>
+    <AuthGuard>
+      <div className="h-screen bg-gray-50 dark:bg-[#0a0a0a] flex overflow-hidden">
+        {/* Sidebar Mobile Overlay */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            />
+          )}
+        </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside 
-        className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-[#111] border-r border-gray-100 dark:border-gray-800 z-50 transition-transform lg:translate-x-0 lg:static lg:block ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="h-full flex flex-col p-6">
-          <Link href="/" className="flex items-center gap-2 mb-10 px-2">
-            <div className="bg-emerald-600 p-1.5 rounded-lg text-white">
-              <GraduationCap size={24} />
+        {/* Sidebar */}
+        <aside 
+          className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-[#111] border-r border-gray-100 dark:border-gray-800 z-50 transition-transform lg:translate-x-0 lg:static lg:block ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="h-full flex flex-col p-6">
+            <Link href="/" className="flex items-center gap-2 mb-10 px-2">
+              <div className="bg-emerald-600 p-1.5 rounded-lg text-white">
+                <GraduationCap size={24} />
+              </div>
+              <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">
+                Ethio<span className="text-emerald-600">Digital</span>
+              </span>
+            </Link>
+
+            <nav className="flex-1 overflow-y-auto pr-2 space-y-1 custom-scrollbar">
+              {navItems[role].map((item: any, idx) => {
+                if (item.type === "header") {
+                  return (
+                    <div key={`header-${idx}`} className="px-4 pt-4 pb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {item.label}
+                    </div>
+                  );
+                }
+                const isActive = item.href === `/dashboard/${role}` 
+                  ? pathname === item.href 
+                  : pathname.startsWith(item.href);
+                
+                return <SidebarItem key={idx} {...item} active={isActive} />;
+              })}
+            </nav>
+
+            <div className="pt-6 border-t border-gray-100 dark:border-gray-800 space-y-1">
+               <SidebarItem 
+                icon={<LifeBuoy size={20} />} 
+                label="Help & Support" 
+                href={`/dashboard/${role}/support`} 
+                active={pathname.includes("/support")}
+              />
             </div>
-            <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">
-              Ethio<span className="text-emerald-600">Digital</span>
-            </span>
-          </Link>
+          </div>
+        </aside>
 
-          <nav className="flex-1 overflow-y-auto pr-2 space-y-1 custom-scrollbar">
-            {navItems[role].map((item, idx) => {
-              const isActive = item.href === `/dashboard/${role}` 
-                ? pathname === item.href 
-                : pathname.startsWith(item.href);
-              
-              return <SidebarItem key={idx} {...item} active={isActive} />;
-            })}
-          </nav>
-
-          <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0 h-full">
+          {/* Header */}
+          <header className="h-20 bg-white dark:bg-[#111] border-b border-gray-100 dark:border-gray-800 px-6 sm:px-10 flex items-center justify-between sticky top-0 z-30">
             <button 
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors font-medium text-sm"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white"
             >
-              <LogOut size={20} />
-              Sign Out
+              <Menu size={24} />
             </button>
-          </div>
+
+            <div className="flex items-center gap-2 sm:gap-4 font-outfit ml-auto">
+              <NotificationBell />
+              <div className="h-8 w-px bg-gray-100 dark:bg-gray-800 flex mx-1"></div>
+              <UserMenu user={user} />
+            </div>
+          </header>
+
+          {/* Page Area */}
+          <main className="flex-1 p-6 sm:p-10 overflow-y-auto custom-scrollbar">
+            {children}
+          </main>
         </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 h-full">
-        {/* Header */}
-        <header className="h-20 bg-white dark:bg-[#111] border-b border-gray-100 dark:border-gray-800 px-6 sm:px-10 flex items-center justify-between sticky top-0 z-30">
-          <button 
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white"
-          >
-            <Menu size={24} />
-          </button>
-
-          <div className="flex items-center gap-4">
-            <NotificationBell />
-            <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</p>
-              <p className="text-xs text-gray-500 capitalize">{user.role}</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center font-bold text-lg">
-              {user.name[0]}
-            </div>
-          </div>
-        </header>
-
-        {/* Page Area */}
-        <main className="flex-1 p-6 sm:p-10 overflow-y-auto custom-scrollbar">
-          {children}
-        </main>
       </div>
-    </div>
+    </AuthGuard>
   );
 }
-
-import { AnimatePresence } from "framer-motion";

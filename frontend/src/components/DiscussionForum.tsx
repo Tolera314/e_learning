@@ -256,7 +256,7 @@ export default function DiscussionForum({ courseId, userRole }: DiscussionForumP
                         <div className="flex items-center gap-2">
                           <div className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
                             {thread.author.avatar ? (
-                               <img src={thread.author.avatar} alt="" className="h-full w-full object-cover" />
+                               <img src={thread.author.avatar} alt="" className="h-full w-full object-cover" loading="lazy" />
                             ) : (
                                <User size={12} className="text-gray-500" />
                             )}

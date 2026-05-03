@@ -8,14 +8,16 @@ const protect = (req, res, next) => {
             const token = req.headers.authorization.split(' ')[1];
             const decoded = (0, jwt_1.verifyToken)(token);
             req.user = decoded;
-            next();
+            return next();
         }
         catch {
             res.status(401).json({ message: 'Not authorized, token failed' });
+            return;
         }
     }
     else {
         res.status(401).json({ message: 'Not authorized, no token' });
+        return;
     }
 };
 exports.protect = protect;

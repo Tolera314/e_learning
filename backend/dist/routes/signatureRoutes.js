@@ -8,6 +8,7 @@ const signatureController_1 = require("../controllers/signatureController");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const router = express_1.default.Router();
 router.get('/ceo', signatureController_1.getCEOSignature); // Public/Shared access
+router.get('/certificate-data', signatureController_1.getGlobalSignatures); // Used for fetching CEO data during rendering
 router.use(authMiddleware_1.protect);
 router.get('/me', signatureController_1.getMySignature);
 router.post('/upload', signatureController_1.updateSignature);

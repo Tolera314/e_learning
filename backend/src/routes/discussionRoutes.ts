@@ -3,7 +3,7 @@ import { protect, authorize } from '../middlewares/authMiddleware';
 import rateLimit from 'express-rate-limit';
 import {
   getCourseDiscussions,
-  createThread,
+  createDiscussionThread,
   getThreadDetails,
   addReply,
   toggleReaction,
@@ -25,7 +25,7 @@ router.use(protect);
 
 // Shared Routes (Student & Instructor)
 router.get('/courses/:courseId/discussions', getCourseDiscussions);
-router.post('/courses/:courseId/discussions', postLimiter, createThread);
+router.post('/courses/:courseId/discussions', postLimiter, createDiscussionThread);
 
 router.get('/discussions/:threadId', getThreadDetails);
 router.post('/discussions/:threadId/replies', postLimiter, addReply);

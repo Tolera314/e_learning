@@ -7,25 +7,45 @@ import {
   Download, 
   Wallet, 
   CreditCard,
-  History
+  History,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import api from "@/lib/api";
 
-const EARNINGS_CARDS = [
-  { label: "Total Earnings", value: "84,250 ETB", sub: "+12.5% from last month", icon: <DollarSign />, color: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600" },
-  { label: "Monthly Earnings", value: "12,400 ETB", sub: "Oct 1 - Oct 31", icon: <TrendingUp />, color: "bg-blue-50 dark:bg-blue-900/20 text-blue-600" },
-  { label: "Pending Payout", value: "4,200 ETB", sub: "Next payout: Nov 15", icon: <Wallet />, color: "bg-amber-50 dark:bg-amber-900/20 text-amber-600" },
-  { label: "Commission Paid", value: "8,425 ETB", sub: "10% Platform Fee", icon: <CreditCard />, color: "bg-gray-50 dark:bg-gray-800 text-gray-400" },
-];
 
-const TRANSACTIONS = [
-  { id: "TX1245", course: "Advanced Calculus for Grade 12", student: "Abebe Kebede", amount: "1,200 ETB", share: "1,080 ETB", date: "Oct 28, 2026", status: "COMPLETED" },
-  { id: "TX1246", course: "Physics Fundamentals", student: "Sara Tesfaye", amount: "1,200 ETB", share: "1,080 ETB", date: "Oct 27, 2026", status: "COMPLETED" },
-  { id: "TX1247", course: "Advanced Calculus for Grade 12", student: "Dawit Haile", amount: "1,200 ETB", share: "1,080 ETB", date: "Oct 25, 2026", status: "PENDING" },
-  { id: "TX1248", course: "Chemistry G11", student: "Tigist Bekele", amount: "800 ETB", share: "720 ETB", date: "Oct 24, 2026", status: "COMPLETED" },
-];
 
 export default function EarningsDashboard() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchEarnings();
+  }, []);
+
+  const fetchEarnings = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get("/instructor/earnings");
+      setData(data);
+    } catch (err) {
+      console.error("Failed to fetch earnings", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+       <div className="flex flex-col items-center justify-center min-h-[400px]">
+          <Loader2 className="animate-spin text-emerald-500 mb-4" size={40} />
+          <p className="text-gray-500 font-medium font-outfit">Loading financial data...</p>
+       </div>
+    );
+  }
+
+  const icons = [<DollarSign key="1" />, <TrendingUp key="2" />, <Wallet key="3" />, <CreditCard key="4" />];
   return (
     <div className="max-w-7xl mx-auto">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
@@ -39,25 +59,24 @@ export default function EarningsDashboard() {
         </button>
       </header>
 
-      {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-         {EARNINGS_CARDS.map((card, i) => (
-           <motion.div 
-             key={i}
-             whileHover={{ y: -5 }}
-             className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm"
-           >
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 ${card.color}`}>
-                 {card.icon}
-              </div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{card.label}</p>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{card.value}</h3>
-              <p className="text-[10px] text-gray-500 font-medium flex items-center gap-1">
-                 {card.sub.includes('+') && <ArrowUpRight size={10} className="text-emerald-500" />} {card.sub}
-              </p>
-           </motion.div>
-         ))}
-      </div>
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          {data.summary.map((card: any, i: number) => (
+            <motion.div 
+              key={i}
+              whileHover={{ y: -5 }}
+              className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm"
+            >
+               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 ${card.color}`}>
+                  {icons[i]}
+               </div>
+               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{card.label}</p>
+               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{card.value}</h3>
+               <p className="text-[10px] text-gray-500 font-medium flex items-center gap-1">
+                  {card.sub.includes('+') && <ArrowUpRight size={10} className="text-emerald-500" />} {card.sub}
+               </p>
+            </motion.div>
+          ))}
+       </div>
 
       {/* TRANSACTION HISTORY */}
       <div className="bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
@@ -78,8 +97,8 @@ export default function EarningsDashboard() {
                      <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400 text-right">Status</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                  {TRANSACTIONS.map((tx) => (
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {data.transactions.map((tx: any) => (
                      <tr key={tx.id} className="hover:bg-gray-50/30 dark:hover:bg-gray-800/10 transition-colors">
                         <td className="px-8 py-6 text-sm">
                            <p className="font-bold text-gray-900 dark:text-white">{tx.date}</p>
@@ -97,7 +116,7 @@ export default function EarningsDashboard() {
                         </td>
                         <td className="px-8 py-6 text-right">
                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${tx.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-gray-50 text-gray-400'}`}>
-                              {tx.status}
+                               {tx.status}
                            </span>
                         </td>
                      </tr>

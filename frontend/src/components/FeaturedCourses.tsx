@@ -1,37 +1,60 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Star, Clock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import api from "@/lib/api";
 
 export default function FeaturedCourses() {
-  const courses = [
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const MOCK_COURSES = [
     {
       id: "1",
       title: "Grade 12 Mathematics (Natural)",
-      instructor: "Ato Dawit T.",
+      instructor: { name: "Ato Dawit T." },
       rating: 4.8,
       duration: "45 Hours",
-      thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&q=80",
+      thumbnailUrl: "/images/course1.jpg",
     },
     {
       id: "2",
       title: "Freshman Physics 101",
-      instructor: "Dr. Aster K.",
+      instructor: { name: "Dr. Aster K." },
       rating: 4.9,
       duration: "60 Hours",
-      thumbnail: "https://images.unsplash.com/photo-1574169208507-84376144848b?w=800&q=80",
+      thumbnailUrl: "/images/course2.jpg",
     },
     {
       id: "3",
       title: "Grade 8 English Preparatory",
-      instructor: "Tr. Bethelhem Y.",
+      instructor: { name: "Tr. Bethelhem Y." },
       rating: 4.7,
       duration: "30 Hours",
-      thumbnail: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80",
+      thumbnailUrl: "/images/course3.jpg",
     },
   ];
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const { data } = await api.get("/courses?limit=3");
+        if (data.data && data.data.length > 0) {
+          setCourses(data.data);
+        } else {
+          setCourses(MOCK_COURSES);
+        }
+      } catch (err) {
+        setCourses(MOCK_COURSES);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCourses();
+  }, []);
 
   return (
     <section className="py-24 bg-white dark:bg-[#0a0a0a]">
@@ -79,7 +102,7 @@ export default function FeaturedCourses() {
             >
               <div className="relative h-48 w-full overflow-hidden">
                 <Image 
-                  src={course.thumbnail} 
+                  src={course.thumbnailUrl || "/images/course1.jpg"} 
                   alt={course.title}
                   fill
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -93,17 +116,17 @@ export default function FeaturedCourses() {
                   {course.title}
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
-                  By {course.instructor}
+                  By {course.instructor?.name || "Expert Instructor"}
                 </p>
                 
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-800">
                   <div className="flex items-center gap-1 text-amber-500">
                     <Star size={16} className="fill-current" />
-                    <span className="font-semibold text-sm">{course.rating}</span>
+                    <span className="font-semibold text-sm">{course.rating || 4.9}</span>
                   </div>
                   <div className="flex items-center gap-1 text-gray-500 text-sm">
                     <Clock size={16} />
-                    <span>{course.duration}</span>
+                    <span>{course.duration || "45 Hours"}</span>
                   </div>
                 </div>
 

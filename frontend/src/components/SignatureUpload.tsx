@@ -121,8 +121,8 @@ export default function SignatureUpload({ onSuccess, initialUrl, role }: Signatu
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("File size must be under 2MB");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be under 5MB");
       return;
     }
 
@@ -237,7 +237,7 @@ export default function SignatureUpload({ onSuccess, initialUrl, role }: Signatu
               </div>
               <div>
                  <p className="text-sm font-bold text-gray-900 dark:text-white">Upload transparent PNG</p>
-                 <p className="text-xs text-gray-400 mt-1">Recommended size: 600x200px (Max 2MB)</p>
+                 <p className="text-xs text-gray-500 mt-1">Recommended size: 600x200px (Max 5MB)</p>
               </div>
               <label className="px-6 py-2.5 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-xl text-xs font-bold cursor-pointer hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all shadow-xl">
                  Browse Files
