@@ -65,6 +65,10 @@ export default function StudentAssignmentView({ courseId }: StudentAssignmentVie
     const handleFileUpload = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!file || !selectedAssignment) return;
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("File is too large. Max limit is 5MB.");
+            return;
+        }
 
         setUploading(true);
         const formData = new FormData();
@@ -258,7 +262,7 @@ export default function StudentAssignmentView({ courseId }: StudentAssignmentVie
                                                     </div>
                                                     <p className="text-sm font-bold text-gray-900 dark:text-white">Click to upload or drag & drop</p>
                                                     <p className="text-[10px] text-gray-500 mt-2 uppercase tracking-widest">
-                                                        Allowed: {selectedAssignment.allowedFileTypes.join(", ")} (Max 10MB)
+                                                        Allowed: {selectedAssignment.allowedFileTypes.join(", ")} (Max 5MB)
                                                     </p>
                                                 </>
                                             )}

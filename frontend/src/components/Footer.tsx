@@ -19,21 +19,27 @@ export default function Footer() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 max-w-sm">
               The premier subscription-based digital learning platform dedicated to the Ethiopian education ecosystem. Learn seamlessly, grow limitlessly.
             </p>
+            <Link 
+              href="/signup" 
+              className="inline-flex items-center justify-center px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors mb-6 shadow-sm"
+            >
+              Start Free Trial
+            </Link>
             <div className="flex gap-4 text-gray-400 hover:text-emerald-500 transition-colors">
-              <a href="#" className="hover:text-emerald-500"><Twitter size={20} /></a>
-              <a href="#" className="hover:text-emerald-500"><Facebook size={20} /></a>
-              <a href="#" className="hover:text-emerald-500"><Instagram size={20} /></a>
-              <a href="#" className="hover:text-emerald-500"><Linkedin size={20} /></a>
+              <a href="#" aria-label="Twitter" className="hover:text-emerald-500"><Twitter size={20} /></a>
+              <a href="#" aria-label="Facebook" className="hover:text-emerald-500"><Facebook size={20} /></a>
+              <a href="#" aria-label="Instagram" className="hover:text-emerald-500"><Instagram size={20} /></a>
+              <a href="#" aria-label="LinkedIn" className="hover:text-emerald-500"><Linkedin size={20} /></a>
             </div>
           </div>
 
           <div>
             <h4 className="font-bold text-gray-900 dark:text-white mb-6">Segments</h4>
             <ul className="space-y-4 text-sm text-gray-500 dark:text-gray-400">
-              <li><Link href="/programs/kg-g5" className="hover:text-emerald-500 transition-colors">KG – Grade 5</Link></li>
-              <li><Link href="/programs/g6-g12" className="hover:text-emerald-500 transition-colors">Grade 6 – 12</Link></li>
-              <li><Link href="/programs/university" className="hover:text-emerald-500 transition-colors">University / College</Link></li>
-              <li><Link href="/programs/trial" className="hover:text-emerald-500 transition-colors">3-Day Free Trial</Link></li>
+              <li><Link href="/courses" className="hover:text-emerald-500 transition-colors">KG – Grade 5</Link></li>
+              <li><Link href="/courses" className="hover:text-emerald-500 transition-colors">Grade 6 – 12</Link></li>
+              <li><Link href="/courses" className="hover:text-emerald-500 transition-colors">University / College</Link></li>
+              <li><Link href="/signup" className="hover:text-emerald-500 transition-colors">3-Day Free Trial</Link></li>
             </ul>
           </div>
 
@@ -41,7 +47,7 @@ export default function Footer() {
             <h4 className="font-bold text-gray-900 dark:text-white mb-6">Company</h4>
             <ul className="space-y-4 text-sm text-gray-500 dark:text-gray-400">
               <li><Link href="/about" className="hover:text-emerald-500 transition-colors">About Us</Link></li>
-              <li><Link href="/instructors" className="hover:text-emerald-500 transition-colors">Become an Instructor</Link></li>
+              <li><Link href="/signup" className="hover:text-emerald-500 transition-colors">Become an Instructor</Link></li>
               <li><Link href="/contact" className="hover:text-emerald-500 transition-colors">Contact Support</Link></li>
               <li><Link href="/partnerships" className="hover:text-emerald-500 transition-colors">School Partnerships</Link></li>
             </ul>

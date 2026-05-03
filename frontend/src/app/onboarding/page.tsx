@@ -5,19 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { 
   User, 
-  BookOpen, 
   Heart, 
   ShieldCheck, 
   CheckCircle2, 
   ChevronRight, 
   ChevronLeft,
-  Camera,
   GraduationCap,
   MessageSquare,
   Upload,
   Loader2
 } from "lucide-react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
 
 const REGIONS = [
   "Addis Ababa", "Afar", "Amhara", "Benishangul-Gumuz", "Dire Dawa", 
@@ -32,9 +31,11 @@ const SUBJECTS = [
 
 export default function Onboarding() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, updateUser } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [globalError, setGlobalError] = useState("");
+  
   const [formData, setFormData] = useState<any>({
     gender: "",
     dob: "",
@@ -47,7 +48,6 @@ export default function Onboarding() {
     subjectsOfInterest: [],
     parentName: "",
     parentPhone: "",
-    // Instructor specific
     highestEducation: "",
     teachingExperience: "",
     bio: "",
@@ -57,19 +57,12 @@ export default function Onboarding() {
     degreeFileName: "",
   });
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      router.push("/login");
-    }
-  }, [router]);
-
+  const [isUploadingDegree, setIsUploadingDegree] = useState(false);
+  
   if (!user) return null;
 
   const role = user.role;
-  const totalSteps = role === "STUDENT" ? 5 : 5;
+  const totalSteps = 5;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -79,11 +72,15 @@ export default function Onboarding() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev: any) => ({
-        ...prev,
-        degreeFile: file,
-        degreeFileName: file.name
-      }));
+      setIsUploadingDegree(true);
+      setTimeout(() => {
+        setFormData((prev: any) => ({
+          ...prev,
+          degreeFile: file,
+          degreeFileName: file.name
+        }));
+        setIsUploadingDegree(false);
+      }, 500);
     }
   };
 
@@ -103,37 +100,27 @@ export default function Onboarding() {
 
   const handleSubmit = async () => {
     setLoading(true);
+    setGlobalError("");
     try {
-      // In a real app, you'd use FormData to upload the file
       const body = { 
         userId: user.id, 
         ...formData,
-        // For now we just send the file name, in real use we'd upload the file separately
         degreeFile: formData.degreeFileName 
       };
 
-      const response = await fetch("http://localhost:8000/api/auth/complete-onboarding", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
-        body: JSON.stringify(body),
-      });
+      await api.post("/auth/complete-onboarding", body);
 
-      if (!response.ok) throw new Error("Onboarding failed");
-
-      const updatedUser = { ...user, onboardingCompleted: true };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      // Update global context state
+      updateUser({ onboardingCompleted: true });
       
       if (role === "INSTRUCTOR") {
-        setStep(6); // Show approval message
+        setStep(6);
       } else {
         router.push("/dashboard/student");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Something went wrong. Please try again.");
+      setGlobalError(err.response?.data?.message || err.message || "Onboarding failed");
     } finally {
       setLoading(false);
     }
@@ -141,9 +128,9 @@ export default function Onboarding() {
 
   const renderProgress = () => (
     <div className="max-w-md mx-auto mb-12">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Step {step} of {totalSteps}</span>
-        <span className="text-xs font-medium text-gray-400 capitalize">{role.toLowerCase()} profile</span>
+      <div className="flex items-center justify-between mb-4 text-xs font-bold uppercase tracking-widest">
+        <span className="text-emerald-600">Step {step} of {totalSteps}</span>
+        <span className="text-gray-400 capitalize">{role.toLowerCase()} profile</span>
       </div>
       <div className="flex gap-2 h-1.5">
         {Array.from({ length: totalSteps }).map((_, i) => (
@@ -156,10 +143,16 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] py-12 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto">
+        {globalError && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-xl flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-400 font-medium">{globalError}</p>
+          </motion.div>
+        )}
+
         {step <= totalSteps && renderProgress()}
 
         <AnimatePresence mode="wait">
-          {/* STEP 1: BASIC PROFILE (Both) */}
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
@@ -202,7 +195,6 @@ export default function Onboarding() {
             </motion.div>
           )}
 
-          {/* STEP 2: EDUCATION LEVEL (Student) / PROFESSIONAL (Instructor) */}
           {step === 2 && role === "STUDENT" && (
             <motion.div key="edu-student" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
@@ -270,7 +262,6 @@ export default function Onboarding() {
             </motion.div>
           )}
 
-          {/* STEP 3: PREFERENCES (Both) */}
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="w-16 h-16 bg-pink-50 dark:bg-pink-900/20 text-pink-600 rounded-2xl flex items-center justify-center mb-6">
@@ -297,7 +288,6 @@ export default function Onboarding() {
             </motion.div>
           )}
 
-          {/* STEP 4: PARENT INFO (Student) / VERIFICATION (Instructor) */}
           {step === 4 && role === "STUDENT" && (
             <motion.div key="parent-info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Parental Information</h2>
@@ -321,20 +311,15 @@ export default function Onboarding() {
               <p className="text-gray-500 mb-8">Upload your teaching credentials for verification.</p>
 
               <div className="space-y-6">
-                 <input 
-                    type="file" 
-                    id="degree-upload" 
-                    className="hidden" 
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleFileChange}
-                 />
-                 <label 
-                    htmlFor="degree-upload"
-                    className="block border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl p-10 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/10 transition-all group"
-                 >
-                    <Upload className="mx-auto text-gray-400 group-hover:text-emerald-500 mb-4 transition-colors" size={40} />
+                 <input type="file" id="degree-upload" className="hidden" disabled={isUploadingDegree} accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
+                 <label htmlFor="degree-upload" className={`block border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl p-10 text-center ${isUploadingDegree ? 'cursor-wait opacity-70' : 'cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/10'} transition-all group`}>
+                    {isUploadingDegree ? (
+                      <Loader2 className="mx-auto text-emerald-500 mb-4 animate-spin" size={40} />
+                    ) : (
+                      <Upload className="mx-auto text-gray-400 group-hover:text-emerald-500 mb-4 transition-colors" size={40} />
+                    )}
                     <p className="text-sm font-bold text-gray-900 dark:text-white">
-                       {formData.degreeFileName ? `Selected: ${formData.degreeFileName}` : "Click to upload your Degree (PDF/JPG)"}
+                       {isUploadingDegree ? "Processing Document..." : formData.degreeFileName ? `Selected: ${formData.degreeFileName}` : "Click to upload your Degree (PDF/JPG)"}
                     </p>
                     <p className="text-xs text-gray-500 mt-2">Maximum file size: 5MB</p>
                  </label>
@@ -352,11 +337,10 @@ export default function Onboarding() {
             </motion.div>
           )}
 
-          {/* STEP 5: FINAL (Both) */}
           {step === 5 && (
             <motion.div key="step5" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-[#111] p-10 rounded-3xl border border-gray-100 dark:border-gray-800 text-center shadow-xl">
                <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                 <ShieldCheck size={40} />
+                 <CheckCircle2 size={40} />
                </div>
                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Ready to Start!</h2>
                <p className="text-gray-500 mb-10">By clicking finish, your profile will be created and your {role === "STUDENT" ? "3-day free trial" : "application"} will be activated.</p>
@@ -370,7 +354,6 @@ export default function Onboarding() {
             </motion.div>
           )}
 
-          {/* STEP 6: INSTRUCTOR APPROVAL PENDING */}
           {step === 6 && (
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-[#111] p-10 rounded-3xl border border-gray-100 dark:border-gray-800 text-center shadow-xl">
                <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">

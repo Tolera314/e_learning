@@ -1,201 +1,143 @@
 "use client";
 
-import { useState } from "react";
-import dynamic from "next/dynamic";
-import { 
-  BarChart3, 
-  Users, 
-  Video, 
-  HelpCircle, 
-  Activity,
-  LayoutDashboard,
-  Settings,
-  Plus
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import { useState, useEffect } from "react";
+import { TrendingUp, Users, BookOpen, CheckCircle2, BarChart3, ArrowUpRight, ArrowDownRight, Filter } from "lucide-react";
+import { motion } from "framer-motion";
+import api from "@/lib/api";
 
-// Lazy Load Components for better performance (LCP)
-const LiveClassMonitor = dynamic(() => import("@/components/LiveClassMonitor"), { 
-  loading: () => <div className="h-96 bg-gray-50 dark:bg-gray-900/50 animate-pulse rounded-3xl" />
-});
-const StudentProgressTracker = dynamic(() => import("@/components/StudentProgressTracker"), {
-  loading: () => <div className="h-96 bg-gray-50 dark:bg-gray-900/50 animate-pulse rounded-3xl" />
-});
-const QuizAnalytics = dynamic(() => import("@/components/QuizAnalytics"), {
-  loading: () => <div className="h-96 bg-gray-50 dark:bg-gray-900/50 animate-pulse rounded-3xl" />
-});
-const PerformanceMonitor = dynamic(() => import("@/components/PerformanceMonitor"), {
-  loading: () => <div className="h-96 bg-gray-50 dark:bg-gray-900/50 animate-pulse rounded-3xl" />
-});
-const CourseMaterialManager = dynamic(() => import("@/components/CourseMaterialManager"), {
-  loading: () => <div className="h-96 bg-gray-50 dark:bg-gray-900/50 animate-pulse rounded-3xl" />
-});
+const TIMEFRAMES = ["7 Days", "30 Days", "3 Months", "All Time"];
 
-export default function InstructorControlPanel() {
-  const [activeTab, setActiveTab] = useState("overview");
+// Simple inline bar chart component
+const BarChart = ({ data, color = "bg-emerald-500" }: { data: number[], color?: string }) => {
+  const max = Math.max(...data);
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return (
+    <div className="flex items-end gap-2 h-32">
+      {data.map((val, i) => (
+        <div key={i} className="flex flex-col items-center flex-1 gap-2">
+          <div className="w-full flex-1 flex flex-col justify-end">
+            <div className={`${color} rounded-t-lg opacity-80 hover:opacity-100 transition-opacity`} style={{ height: `${(val / max) * 100}%` }} />
+          </div>
+          <span className="text-[9px] text-gray-400 font-medium">{days[i]}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
-  const tabs = [
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "live", label: "Live Sessions", icon: Video },
-    { id: "materials", label: "Materials", icon: BarChart3 },
-    { id: "students", label: "Student Progress", icon: Users },
-    { id: "quizzes", label: "Quiz Analytics", icon: HelpCircle },
-    { id: "performance", label: "System Health", icon: Activity },
-  ];
+export default function AnalyticsDashboard() {
+  const [timeframe, setTimeframe] = useState("30 Days");
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/instructor/dashboard-analytics")
+      .then(res => setData(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="p-8 text-center animate-pulse">Loading Analytics...</div>;
+
+  const { stats, courseStats, charts } = data || { stats: [], courseStats: [], charts: { dailyEnrolments: [], revenueGrowth: [] } };
 
   return (
     <div className="max-w-7xl mx-auto space-y-10">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* HEADER */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 dark:text-white italic tracking-tight">Teaching Control Panel</h1>
-          <p className="text-gray-500 font-medium mt-2">The central command center for your teaching activities and student performance.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Teaching Analytics</h1>
+          <p className="text-gray-500 mt-2">Track your teaching performance, student engagement, and revenue trends.</p>
         </div>
-        <div className="flex gap-3">
-           <button className="px-6 py-3 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl font-black text-xs hover:bg-gray-50 transition-all flex items-center gap-2">
-              <Settings size={18} /> Panel Settings
-           </button>
-           <button className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs shadow-xl shadow-emerald-500/20 hover:scale-[1.02] transition-all flex items-center gap-2">
-              <Plus size={18} /> New Session
-           </button>
+        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-2xl">
+          {TIMEFRAMES.map(t => (
+            <button
+              key={t}
+              onClick={() => setTimeframe(t)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${timeframe === t ? 'bg-white dark:bg-[#111] text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
       </header>
 
-      {/* NAVIGATION TABS */}
-      <div className="flex flex-wrap gap-2 p-2 bg-gray-100 dark:bg-gray-800/50 rounded-3xl w-fit">
-         {tabs.map(tab => (
-            <button
-               key={tab.id}
-               onClick={() => setActiveTab(tab.id)}
-               className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black transition-all ${activeTab === tab.id ? 'bg-white dark:bg-[#111] text-emerald-600 shadow-md' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-            >
-               <tab.icon size={16} /> {tab.label}
-            </button>
-         ))}
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((card: any, i: number) => (
+          <motion.div key={i} whileHover={{ y: -4 }} className="bg-white dark:bg-[#111] p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{card.label}</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white mb-2">{card.value}</p>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${card.up ? 'text-emerald-600' : 'text-red-500'}`}>
+              {card.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />} {card.change} this period
+            </span>
+          </motion.div>
+        ))}
       </div>
 
-      {/* CONTENT AREA */}
-      <div className="min-h-[600px]">
-         <AnimatePresence mode="wait">
-            {activeTab === 'overview' && (
-               <motion.div 
-                 key="overview"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -10 }}
-                 className="space-y-10"
-               >
-                  {/* Reuse existing summary cards or similar */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                     {[
-                       { label: "Total Students", value: "3,842", trend: "+12%", color: "text-blue-500" },
-                       { label: "Active Today", value: "210", trend: "+5%", color: "text-emerald-500" },
-                       { label: "Course Completion", value: "48%", trend: "+2%", color: "text-purple-500" },
-                       { label: "Questions Asked", value: "24", trend: "-3%", color: "text-amber-500" }
-                     ].map((stat, i) => (
-                        <div key={i} className="p-8 bg-white dark:bg-[#111] rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
-                           <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4">{stat.label}</p>
-                           <div className="flex justify-between items-end">
-                              <h3 className={`text-3xl font-black ${stat.color}`}>{stat.value}</h3>
-                              <span className="text-[10px] font-black bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-lg text-gray-500">{stat.trend}</span>
-                           </div>
-                        </div>
-                     ))}
-                  </div>
+      {/* CHARTS ROW */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Users size={18} className="text-blue-500" /> Daily Enrolments</h3>
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg">{timeframe}</span>
+          </div>
+          <BarChart data={charts.dailyEnrolments} color="bg-blue-400" />
+        </div>
 
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-                     <div className="xl:col-span-2 space-y-8">
-                        <div className="p-8 bg-white dark:bg-[#111] rounded-[2.5rem] border border-gray-100 dark:border-gray-800">
-                           <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6">Engagement Trends</h3>
-                           <div className="h-48 flex items-center justify-center border-2 border-dashed border-gray-50 dark:border-gray-800 rounded-3xl text-gray-400 font-bold text-xs uppercase tracking-widest">
-                              [ Engagement Chart Placeholder ]
-                           </div>
-                        </div>
-                        <ErrorBoundary componentName="LiveClassMonitor">
-                           <LiveClassMonitor />
-                        </ErrorBoundary>
-                     </div>
-                     <div className="space-y-8">
-                        <ErrorBoundary componentName="QuizAnalytics">
-                           <QuizAnalytics />
-                        </ErrorBoundary>
-                        <div className="p-8 bg-gray-900 rounded-[2.5rem] text-white">
-                           <h3 className="text-xl font-black mb-4 italic">Next Teaching Goal</h3>
-                           <p className="text-sm opacity-60 leading-relaxed mb-6">You've reached 85% completion in "Advanced Calculus". Schedule the final exam preparation session to boost student confidence!</p>
-                           <button className="w-full py-4 bg-emerald-600 rounded-2xl font-black text-xs hover:bg-emerald-700 transition-all">
-                              Set Goal Reminder
-                           </button>
-                        </div>
-                     </div>
-                  </div>
-               </motion.div>
-            )}
+        <div className="bg-white dark:bg-[#111] p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><TrendingUp size={18} className="text-emerald-500" /> Revenue (ETB)</h3>
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg">{timeframe}</span>
+          </div>
+          <BarChart data={charts.revenueGrowth} color="bg-emerald-400" />
+        </div>
+      </div>
 
-            {activeTab === 'live' && (
-               <motion.div 
-                 key="live"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -10 }}
-               >
-                  <ErrorBoundary componentName="LiveClassMonitor">
-                     <LiveClassMonitor />
-                  </ErrorBoundary>
-               </motion.div>
-            )}
-
-            {activeTab === 'materials' && (
-               <motion.div 
-                 key="materials"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -10 }}
-               >
-                  <ErrorBoundary componentName="CourseMaterialManager">
-                     <CourseMaterialManager />
-                  </ErrorBoundary>
-               </motion.div>
-            )}
-
-            {activeTab === 'students' && (
-               <motion.div 
-                 key="students"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -10 }}
-               >
-                  <ErrorBoundary componentName="StudentProgressTracker">
-                     <StudentProgressTracker />
-                  </ErrorBoundary>
-               </motion.div>
-            )}
-
-            {activeTab === 'quizzes' && (
-               <motion.div 
-                 key="quizzes"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -10 }}
-               >
-                  <ErrorBoundary componentName="QuizAnalytics">
-                     <QuizAnalytics />
-                  </ErrorBoundary>
-               </motion.div>
-            )}
-
-            {activeTab === 'performance' && (
-               <motion.div 
-                 key="performance"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -10 }}
-               >
-                  <ErrorBoundary componentName="PerformanceMonitor">
-                     <PerformanceMonitor />
-                  </ErrorBoundary>
-               </motion.div>
-            )}
-         </AnimatePresence>
+      {/* COURSE PERFORMANCE TABLE */}
+      <div className="bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 dark:border-gray-800">
+          <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><BarChart3 size={18} className="text-purple-500" /> Course-Level Performance</h3>
+          <button className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-emerald-600 transition-colors">
+            <Filter size={14} /> Filter
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-50 dark:border-gray-800 bg-gray-50/50">
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-gray-400">Course</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-gray-400">Students</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-gray-400">Completion</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-gray-400 text-right">Revenue</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+              {courseStats.map((c: any, i: number) => (
+                <tr key={i} className="hover:bg-gray-50/30 dark:hover:bg-gray-800/10 transition-colors">
+                  <td className="px-8 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+                        <BookOpen size={14} className="text-purple-600" />
+                      </div>
+                      <span className="font-bold text-sm text-gray-900 dark:text-white">{c.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 text-sm font-bold text-gray-700 dark:text-gray-300">{c.students.toLocaleString()}</td>
+                  <td className="px-8 py-5">
+                    <div className="flex items-center gap-3 w-32">
+                      <div className="h-1.5 flex-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${c.completion}%` }} />
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600">{c.completion}%</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 text-right text-sm font-bold text-gray-900 dark:text-white">{c.revenue}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -11,12 +11,14 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction): vo
       const token = req.headers.authorization.split(' ')[1];
       const decoded = verifyToken(token) as { id: string; role: string };
       req.user = decoded;
-      next();
+      return next();
     } catch {
       res.status(401).json({ message: 'Not authorized, token failed' });
+      return;
     }
   } else {
     res.status(401).json({ message: 'Not authorized, no token' });
+    return;
   }
 };
 

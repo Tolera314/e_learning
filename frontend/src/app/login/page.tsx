@@ -11,16 +11,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const loginSchema = z.object({
   phoneOrEmail: z.string().min(1, { message: "Email or Phone is required" }),
   password: z.string().min(1, { message: "Password is required" }),
+  rememberMe: z.boolean().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const router = useRouter();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [globalError, setGlobalError] = useState("");
 
@@ -41,19 +44,19 @@ export default function Login() {
       const response = await api.post("/auth/login", {
         identifier: data.phoneOrEmail,
         password: data.password,
+        rememberMe: data.rememberMe,
       });
 
       const resData = response.data;
 
-      // Store JWTs
-      localStorage.setItem("token", resData.token);
-      localStorage.setItem("refreshToken", resData.refreshToken);
-      localStorage.setItem("user", JSON.stringify(resData.user));
+      // Centralized session initiation
+      login(resData.token, resData.refreshToken, resData.user);
 
-      if (!resData.user.onboardingCompleted) {
-        router.push("/onboarding");
-      } else {
+      // Routing logic handled by AuthContext/Guard typically, but we can do an immediate redirect here
+      if (resData.user.role === "ADMIN" || resData.user.onboardingCompleted) {
         router.push(`/dashboard/${resData.user.role.toLowerCase()}`);
+      } else {
+        router.push("/onboarding");
       }
     } catch (err: any) {
       setGlobalError(err.response?.data?.message || err.message || "Login failed");
@@ -65,7 +68,7 @@ export default function Login() {
   return (
     <AuthLayout
       imagePosition="right"
-      imageUrl="https://images.unsplash.com/photo-1577896851231-70ef18881754?w=1200&q=80"
+      imageUrl="/images/login_bg.jpg"
       imageQuote="The beautiful thing about learning is that nobody can take it away from you."
       imageAuthor="B.B. King"
     >
@@ -129,8 +132,8 @@ export default function Login() {
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center">
               <input
+                {...register("rememberMe")}
                 id="remember-me"
-                name="remember-me"
                 type="checkbox"
                 className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
               />
@@ -140,9 +143,9 @@ export default function Login() {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-semibold text-emerald-600 hover:text-emerald-500 transition-colors">
+              <Link href="/forgot-password" className="font-semibold text-emerald-600 hover:text-emerald-500 transition-colors">
                 Forgot password?
-              </a>
+              </Link>
             </div>
           </div>
 

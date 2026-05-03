@@ -31,8 +31,8 @@ app.use((0, cors_1.default)({
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
 }));
 // Payload parsing
-app.use(express_1.default.json({ limit: "1mb" }));
-app.use(express_1.default.urlencoded({ extended: true, limit: "1mb" }));
+app.use(express_1.default.json({ limit: "6mb" }));
+app.use(express_1.default.urlencoded({ extended: true, limit: "6mb" }));
 // Static files for uploads (Assignment submissions)
 app.use('/uploads', express_1.default.static('uploads'));
 // Auth Rate Limiting — prevent brute-force attacks (20 requests per 15 min)
@@ -65,10 +65,14 @@ const signatureRoutes_1 = __importDefault(require("./routes/signatureRoutes"));
 const certificateRoutes_1 = __importDefault(require("./routes/certificateRoutes"));
 const paymentRoutes_1 = __importDefault(require("./routes/paymentRoutes"));
 const searchRoutes_1 = __importDefault(require("./routes/searchRoutes"));
+const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
+const lessonRoutes_1 = __importDefault(require("./routes/lessonRoutes"));
+const pollRoutes_1 = __importDefault(require("./routes/pollRoutes"));
 // Routes — auth routes have stricter rate limits
 app.use("/api/auth", authLimiter, authRoutes_1.default);
 app.use("/api/dashboard", apiLimiter, dashboardRoutes_1.default);
 app.use("/api/courses", apiLimiter, courseRoutes_1.default);
+app.use("/api/lessons", apiLimiter, lessonRoutes_1.default);
 app.use("/api/enrollments", apiLimiter, enrollmentRoutes_1.default);
 app.use("/api/instructor", apiLimiter, instructorRoutes_1.default);
 app.use("/api/student", apiLimiter, studentRoutes_1.default);
@@ -78,8 +82,10 @@ app.use("/api/messages", apiLimiter, messageRoutes_1.default);
 app.use("/api/quizzes", apiLimiter, quizRoutes_1.default);
 app.use("/api/signatures", apiLimiter, signatureRoutes_1.default);
 app.use("/api/certificates", apiLimiter, certificateRoutes_1.default);
-app.use("/api/payments", paymentRoutes_1.default); // Prefix handles its own auth/raw-body as needed
+app.use("/api/payments", paymentRoutes_1.default);
 app.use("/api/search", apiLimiter, searchRoutes_1.default);
+app.use("/api/admin", apiLimiter, adminRoutes_1.default);
+app.use("/api/polls", apiLimiter, pollRoutes_1.default);
 // Basic Health Check
 app.get("/api/health", (req, res) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });

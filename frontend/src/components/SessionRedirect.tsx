@@ -3,30 +3,24 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function SessionRedirect() {
   const router = useRouter();
 
-  useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
+  const { user, isLoading } = useAuth();
 
-    if (userStr && token) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user && user.role) {
-          // If they haven't completed onboarding, the dashboard check might still catch them,
-          // but let's be safe and send them to the appropriate place
-          if (!user.onboardingCompleted) {
-            router.push("/onboarding");
-          } else {
-            router.push(`/dashboard/${user.role.toLowerCase()}`);
-          }
-        }
-      } catch (e) {
-        console.error("Session check failed", e);
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (user) {
+      if (user.role === "ADMIN" || user.onboardingCompleted) {
+        router.push(`/dashboard/${user.role.toLowerCase()}`);
+      } else {
+        router.push("/onboarding");
       }
     }
-  }, [router]);
+  }, [user, isLoading, router]);
 
   return null;
 }

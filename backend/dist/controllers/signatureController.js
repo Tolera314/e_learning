@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCEOSignature = exports.getMySignature = exports.getCertificateSignatures = exports.updateSignature = void 0;
+exports.getGlobalSignatures = exports.getCEOSignature = exports.getMySignature = exports.getCertificateSignatures = exports.updateSignature = void 0;
 const prisma_1 = require("../utils/prisma");
 /**
  * UPLOAD/UPDATE SIGNATURE
@@ -103,3 +103,25 @@ const getCEOSignature = async (req, res) => {
     }
 };
 exports.getCEOSignature = getCEOSignature;
+/**
+ * GET GLOBAL SIGNATURES FOR CERTIFICATE DATA
+ */
+const getGlobalSignatures = async (req, res) => {
+    try {
+        const ceoSignature = await prisma_1.prisma.signature.findFirst({
+            where: { role: 'CEO' },
+            include: { user: { select: { name: true } } }
+        });
+        res.status(200).json({
+            ceo: ceoSignature ? {
+                name: ceoSignature.user?.name || "Executive Director",
+                signatureUrl: ceoSignature.signatureUrl || ""
+            } : null
+        });
+    }
+    catch (error) {
+        console.error('Get global signatures error:', error);
+        res.status(500).json({ error: 'Failed to fetch global signatures' });
+    }
+};
+exports.getGlobalSignatures = getGlobalSignatures;

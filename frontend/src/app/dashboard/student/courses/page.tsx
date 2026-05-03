@@ -11,17 +11,27 @@ import {
   Clock,
   Heart
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
+import api from "@/lib/api";
+import { toast } from "react-hot-toast";
 
-const COURSES = [
-  { id: "1", title: "Advanced Calculus for G12", instructor: "Dr. Abebe Kebede", progress: 65, rating: 4.8, status: "in-progress", image: "/course1.jpg" },
-  { id: "2", title: "Physics Fundamentals: Mechanics", instructor: "Prof. Sara Tesfaye", progress: 12, rating: 4.9, status: "in-progress", image: "/course2.jpg" },
-  { id: "3", title: "Introduction to Amharic Literature", instructor: "Mulugeta Haile", progress: 100, rating: 4.7, status: "completed", image: "/course3.jpg" },
-  { id: "4", title: "Biology: Modern Genetics", instructor: "Dr. Dawit G/M", progress: 0, rating: 4.6, status: "saved", image: "/course4.jpg" },
-];
+interface Course {
+  id: string; 
+  title: string; 
+  instructor: string; 
+  progress: number; 
+  isCompleted: boolean;
+  thumbnailUrl?: string; 
+  category: string; 
+  level: string; 
+  totalLessons: number;
+  lastAccessed?: string;
+  isWishlisted?: boolean;
+}
 
-const CourseCard = ({ course }: any) => (
+const CourseCard = ({ course, onToggleWishlist }: { course: Course; onToggleWishlist: (id: string) => void }) => (
   <motion.div 
     whileHover={{ y: -5 }}
     className="bg-white dark:bg-[#111] rounded-[2.5rem] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm group hover:border-emerald-500 transition-all"
@@ -30,16 +40,22 @@ const CourseCard = ({ course }: any) => (
        <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/10 to-blue-600/10 flex items-center justify-center">
           <BookOpen className="text-white/20" size={60} />
        </div>
-       {course.status === 'completed' && (
+        {course.isCompleted && (
           <div className="absolute top-4 right-4 bg-emerald-100 text-emerald-700 p-2 rounded-xl backdrop-blur-md">
              <CheckCircle2 size={20} />
           </div>
-       )}
+        )}
+        <button 
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleWishlist(course.id); }}
+          className={`absolute top-4 left-4 p-2 rounded-xl backdrop-blur-md transition-colors ${course.isWishlisted ? 'bg-rose-100 text-rose-600' : 'bg-white/80 text-gray-400 hover:text-rose-600'}`}
+        >
+           <Heart size={20} fill={course.isWishlisted ? "currentColor" : "none"} />
+        </button>
     </div>
     <div className="p-6">
        <div className="flex items-center gap-2 mb-3">
           <div className="p-1 px-2.5 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-             <Star size={12} className="text-amber-500" /> {course.rating}
+             <Star size={12} className="text-amber-500" /> {course.level || "Beginner"}
           </div>
           <div className="p-1 px-2.5 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
              <Clock size={12} className="text-emerald-500" /> 12h 45m
@@ -50,27 +66,37 @@ const CourseCard = ({ course }: any) => (
           <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
              <User size={12} />
           </div>
-          <span className="text-xs text-gray-500 font-medium">{course.instructor}</span>
-       </div>
+           <span className="text-xs text-gray-500 font-medium">{course.instructor}</span>
+        </div>
 
-       {course.status !== 'saved' && (
+        {course.lastAccessed && (
+           <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mb-4 font-medium uppercase tracking-wider">
+              <Clock size={10} />
+              Last seen {formatDistanceToNow(new Date(course.lastAccessed), { addSuffix: true })}
+           </div>
+        )}
+
+       {!course.isCompleted && (
           <div className="space-y-3 mb-6">
              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
                 <span>Progress</span>
                 <span>{course.progress}%</span>
              </div>
-             <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+             <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-1">
                 <motion.div 
                    initial={{ width: 0 }}
                    animate={{ width: `${course.progress}%` }}
                    className="h-full bg-emerald-600 rounded-full" 
                 />
              </div>
+             {!course.isCompleted && course.progress > 0 && (
+                <p className="text-[10px] text-gray-500 font-medium pt-1">Continue your progress</p>
+             )}
           </div>
        )}
 
        <button className="w-full py-3.5 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-2xl font-bold text-sm hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all flex items-center justify-center gap-2">
-          {course.status === 'completed' ? 'Re-watch Lessons' : course.status === 'saved' ? 'Start Enrollment' : 'Continue Learning'} <Play size={14} fill="currentColor" />
+          {course.isCompleted ? 'Re-watch Lessons' : course.progress === 0 ? 'Start Course' : 'Continue Learning'} <Play size={14} fill="currentColor" />
        </button>
     </div>
   </motion.div>
@@ -78,8 +104,61 @@ const CourseCard = ({ course }: any) => (
 
 export default function MyCourses() {
   const [activeTab, setActiveTab] = useState("in-progress");
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [wishlist, setWishlist] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredCourses = COURSES.filter(c => c.status === activeTab);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [coursesRes, wishlistRes] = await Promise.all([
+          api.get("/student/courses"),
+          api.get("/student/wishlist")
+        ]);
+        
+        // Merge wishlist status into courses
+        const wishlistIds = new Set(wishlistRes.data.map((w: any) => w.id));
+        const mergedCourses = coursesRes.data.map((c: any) => ({
+          ...c,
+          isWishlisted: wishlistIds.has(c.id)
+        }));
+
+        setCourses(mergedCourses);
+        setWishlist(wishlistRes.data.map((w: any) => ({ ...w, isWishlisted: true })));
+      } catch (err) {
+        toast.error("Failed to load library data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleToggleWishlist = async (courseId: string) => {
+    try {
+      const res = await api.post(`/student/wishlist/toggle/${courseId}`);
+      const isAdded = res.data.wishlisted;
+      
+      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: isAdded } : c));
+      
+      if (isAdded) {
+        const courseToAdd = courses.find(c => c.id === courseId);
+        if (courseToAdd) setWishlist(prev => [...prev, { ...courseToAdd, isWishlisted: true }]);
+        toast.success("Added to wishlist");
+      } else {
+        setWishlist(prev => prev.filter(c => c.id !== courseId));
+        toast.success("Removed from wishlist");
+      }
+    } catch (err) {
+      toast.error("Action failed");
+    }
+  };
+
+  const filteredCourses = activeTab === "saved" ? wishlist : courses.filter(c => 
+    activeTab === "completed" ? c.isCompleted :
+    !c.isCompleted && c.progress > 0 // In Progress
+  );
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -119,8 +198,19 @@ export default function MyCourses() {
       </div>
 
       {/* COURSE GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-         {filteredCourses.map(course => <CourseCard key={course.id} course={course} />)}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {Array.from({length:4}).map((_,i) => <div key={i} className="h-72 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-[2.5rem]" />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+           {filteredCourses.map(course => (
+             <CourseCard 
+               key={course.id} 
+               course={course} 
+               onToggleWishlist={handleToggleWishlist}
+             />
+           ))}
          
          {filteredCourses.length === 0 && (
             <div className="col-span-full py-20 text-center bg-gray-50/50 dark:bg-gray-800/20 rounded-[3rem] border-2 border-dashed border-gray-100 dark:border-gray-800">
@@ -131,6 +221,7 @@ export default function MyCourses() {
             </div>
          )}
       </div>
-    </div>
-  );
+      )}
+    </div>    
+    );
 }

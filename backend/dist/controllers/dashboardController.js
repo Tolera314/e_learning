@@ -3,9 +3,33 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAdminDashboard = exports.getInstructorDashboard = exports.getStudentDashboard = void 0;
+exports.getAdminDashboard = exports.getInstructorDashboard = exports.getStudentDashboard = exports.getPublicStats = void 0;
 const prisma_1 = require("../utils/prisma");
 const logger_1 = __importDefault(require("../utils/logger"));
+const getPublicStats = async (req, res) => {
+    try {
+        const [totalCourses, totalUsers, totalEnrollments, avgRatingAgg] = await Promise.all([
+            prisma_1.prisma.course.count({ where: { visibility: 'PUBLISHED' } }),
+            prisma_1.prisma.user.count(),
+            prisma_1.prisma.enrollment.count(),
+            prisma_1.prisma.course.aggregate({
+                where: { visibility: 'PUBLISHED' },
+                _avg: { rating: true }
+            })
+        ]);
+        res.json({
+            totalCourses,
+            totalStudents: totalUsers,
+            totalEnrollments,
+            averageRating: avgRatingAgg._avg.rating || 4.8
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ error }, 'Error fetching public stats');
+        res.status(500).json({ message: 'Server error retrieving public stats' });
+    }
+};
+exports.getPublicStats = getPublicStats;
 const getStudentDashboard = async (req, res) => {
     try {
         const studentId = req.user?.id;

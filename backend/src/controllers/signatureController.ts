@@ -106,3 +106,25 @@ export const getCEOSignature = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch CEO signature' });
   }
 };
+
+/**
+ * GET GLOBAL SIGNATURES FOR CERTIFICATE DATA
+ */
+export const getGlobalSignatures = async (req: Request, res: Response) => {
+  try {
+    const ceoSignature = await prisma.signature.findFirst({
+      where: { role: 'CEO' },
+      include: { user: { select: { name: true } } }
+    });
+    
+    res.status(200).json({
+      ceo: ceoSignature ? {
+        name: ceoSignature.user?.name || "Executive Director",
+        signatureUrl: ceoSignature.signatureUrl || ""
+      } : null
+    });
+  } catch (error) {
+    console.error('Get global signatures error:', error);
+    res.status(500).json({ error: 'Failed to fetch global signatures' });
+  }
+};

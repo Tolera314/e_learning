@@ -10,19 +10,19 @@ export default function Testimonials() {
       text: "Ethio-Digital-Academy helped me prepare for my national exams entirely from home. The video lessons are incredibly clear.",
       author: "Meron A.",
       role: "Grade 12 Student",
-      image: "https://images.unsplash.com/photo-1531123897727-8f129e1bfa82?w=400&h=400&fit=crop&q=80",
+      image: "/images/student1.jpg",
     },
     {
       text: "The language support is amazing. Being able to switch between Amharic and English made catching up on Math so much easier.",
       author: "Yonas G.",
       role: "Grade 8 Student",
-      image: "https://images.unsplash.com/photo-1506277886164-e25aa3f4ef7f?w=400&h=400&fit=crop&q=80",
+      image: "/images/student2.jpg",
     },
     {
       text: "As a parent, the progress tracking feature gives me peace of mind knowing exactly what areas my child needs help with.",
       author: "Abebech T.",
       role: "Parent of KG student",
-      image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=400&h=400&fit=crop&q=80",
+      image: "/images/student3.jpg",
     },
   ];
 

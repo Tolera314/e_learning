@@ -11,6 +11,8 @@ const router = express_1.default.Router();
 router.use(authMiddleware_1.protect);
 // Instructor Routes
 router.post('/instructor', (0, authMiddleware_1.authorize)('INSTRUCTOR', 'ADMIN'), quizController_1.createQuiz);
+router.get('/instructor', (0, authMiddleware_1.authorize)('INSTRUCTOR', 'ADMIN'), quizController_1.getMyQuizzes);
+router.get('/instructor/course/:courseId', (0, authMiddleware_1.authorize)('INSTRUCTOR', 'ADMIN'), quizController_1.getMyQuizzes);
 router.get('/instructor/:id/submissions', (0, authMiddleware_1.authorize)('INSTRUCTOR', 'ADMIN'), quizController_1.getQuizSubmissions);
 // Shared/Student Routes (Subscription Required)
 router.get('/:id', subscriptionMiddleware_1.checkSubscription, quizController_1.getQuiz);

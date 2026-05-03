@@ -3,12 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.logout = exports.refreshToken = exports.login = exports.completeOnboarding = exports.resendOTP = exports.verifyOTP = exports.register = void 0;
+exports.logout = exports.resetPassword = exports.forgotPassword = exports.refreshToken = exports.login = exports.completeOnboarding = exports.resendOTP = exports.verifyOTP = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const zod_1 = require("zod");
 const prisma_1 = require("../utils/prisma");
 const jwt_1 = require("../utils/jwt");
-const mail_1 = require("../utils/mail");
+const emailQueue_1 = require("../queues/emailQueue");
+const logger_1 = __importDefault(require("../utils/logger"));
 // Validation Schemas
 const registerSchema = zod_1.z.object({
     name: zod_1.z.string().min(2),
@@ -20,6 +21,7 @@ const registerSchema = zod_1.z.object({
 const loginSchema = zod_1.z.object({
     identifier: zod_1.z.string(), // email or phone
     password: zod_1.z.string(),
+    rememberMe: zod_1.z.boolean().optional(),
 });
 const register = async (req, res) => {
     try {
@@ -56,19 +58,23 @@ const register = async (req, res) => {
                 verificationExpires: expires,
             }
         });
-        // Send OTP via Email if provided
+        // Send OTP via Email if provided (Queueing job)
         if (data.email) {
-            console.log(`[DEBUG] Attempting to send OTP email to: ${data.email}`);
-            const mailResult = await (0, mail_1.sendOTPEmail)(data.email, otp, data.name);
-            if (mailResult.success) {
-                console.log(`[DEBUG] OTP email sent successfully to ${data.email}`);
-            }
-            else {
-                console.warn(`[DEBUG] Failed to send OTP email to ${data.email}. Check Resend API key.`);
-            }
+            await emailQueue_1.emailQueue.add(`otp-${user.id}`, {
+                email: data.email,
+                otp: otp,
+                name: data.name
+            }, {
+                attempts: 3,
+                backoff: { type: 'exponential', delay: 1000 }
+            });
         }
-        // Audit log — OTP is intentionally NOT logged in production
-        console.log(`[AUTH] New registration: ${data.name} | ${data.phoneNumber} | ${expires.toISOString()}`);
+        // Structured Audit Log
+        logger_1.default.info({
+            userId: user.id,
+            role: user.role,
+            event: 'user_registered'
+        }, 'New user registered');
         res.status(201).json({
             message: 'User registered successfully. Please verify OTP.',
             userId: user.id
@@ -122,7 +128,9 @@ const verifyOTP = async (req, res) => {
                 id: user.id,
                 name: user.name,
                 role: user.role,
-                isVerified: true
+                avatar: user.avatar,
+                isVerified: true,
+                onboardingCompleted: user.onboardingCompleted
             },
             token
         });
@@ -161,9 +169,13 @@ const resendOTP = async (req, res) => {
             }
         });
         if (user.email) {
-            await (0, mail_1.sendOTPEmail)(user.email, otp, user.name);
+            await emailQueue_1.emailQueue.add(`resend-otp-${user.id}`, {
+                email: user.email,
+                otp: otp,
+                name: user.name
+            });
         }
-        console.log(`[AUTH] OTP resent for user: ${user.id}`);
+        logger_1.default.info({ userId: user.id }, 'OTP resent');
         res.json({ message: 'OTP resent successfully' });
     }
     catch (error) {
@@ -173,13 +185,22 @@ const resendOTP = async (req, res) => {
 exports.resendOTP = resendOTP;
 const completeOnboarding = async (req, res) => {
     try {
-        const { userId, ...data } = req.body;
+        const userId = req.user?.id; // Use authenticated userId, not from body
+        const data = req.body;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
         const user = await prisma_1.prisma.user.findUnique({
             where: { id: userId },
             include: { studentProfile: true, instructorProfile: true }
         });
         if (!user) {
             res.status(404).json({ message: 'User not found' });
+            return;
+        }
+        if (user.onboardingCompleted) {
+            res.status(400).json({ message: 'Onboarding is already completed. This can only be done once.' });
             return;
         }
         if (user.role === 'STUDENT') {
@@ -258,7 +279,7 @@ const completeOnboarding = async (req, res) => {
                 where: { id: userId },
                 data: { trialUsed: true }
             });
-            console.log(`[SUBSCRIPTION] 3-Day Trial provisioned for user ${userId}`);
+            logger_1.default.info({ userId, event: 'trial_provisioned' }, '3-Day Trial provisioned');
         }
         res.json({ message: 'Onboarding completed successfully' });
     }
@@ -289,15 +310,29 @@ const login = async (req, res) => {
             return;
         }
         const token = (0, jwt_1.generateToken)(user.id, user.role);
+        let refreshToken;
+        if (data.rememberMe) {
+            refreshToken = (0, jwt_1.generateRefreshToken)();
+            const hashed = (0, jwt_1.hashRefreshToken)(refreshToken);
+            await prisma_1.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    refreshToken: hashed,
+                    refreshTokenExpires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                }
+            });
+        }
         res.json({
             user: {
                 id: user.id,
                 name: user.name,
                 role: user.role,
+                avatar: user.avatar,
                 isVerified: user.isVerified,
                 onboardingCompleted: user.onboardingCompleted
             },
-            token
+            token,
+            refreshToken
         });
     }
     catch (error) {
@@ -351,6 +386,91 @@ const refreshToken = async (req, res) => {
     }
 };
 exports.refreshToken = refreshToken;
+// ─────────────────────────────────────────────────────────────────
+// Forgot Password & Reset Password
+// ─────────────────────────────────────────────────────────────────
+const forgotPasswordSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+});
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = forgotPasswordSchema.parse(req.body);
+        const user = await prisma_1.prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            // Don't leak whether user exists or not
+            res.json({ message: 'If an account with that email exists, we have sent a reset link.' });
+            return;
+        }
+        const crypto = await import('crypto');
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const hashed = crypto.createHash('sha256').update(resetToken).digest('hex');
+        const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+        await prisma_1.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                resetToken: hashed,
+                resetTokenExpires: expires
+            }
+        });
+        await emailQueue_1.emailQueue.add(`reset-${user.id}`, {
+            email: user.email,
+            otp: resetToken,
+            name: user.name,
+            isPasswordReset: true
+        });
+        res.json({ message: 'If an account with that email exists, we have sent a reset link.' });
+    }
+    catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ errors: error.errors });
+        }
+        else {
+            res.status(500).json({ message: 'Server error' });
+        }
+    }
+};
+exports.forgotPassword = forgotPassword;
+const resetPasswordSchema = zod_1.z.object({
+    token: zod_1.z.string(),
+    newPassword: zod_1.z.string().min(6),
+});
+const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = resetPasswordSchema.parse(req.body);
+        const crypto = await import('crypto');
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+        const user = await prisma_1.prisma.user.findFirst({
+            where: {
+                resetToken: hashedToken,
+                resetTokenExpires: { gt: new Date() }
+            }
+        });
+        if (!user) {
+            res.status(400).json({ message: 'Invalid or expired reset token' });
+            return;
+        }
+        const salt = await bcrypt_1.default.genSalt(10);
+        const hashedPassword = await bcrypt_1.default.hash(newPassword, salt);
+        await prisma_1.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                passwordHash: hashedPassword,
+                resetToken: null,
+                resetTokenExpires: null
+            }
+        });
+        res.json({ message: 'Password reset successfully' });
+    }
+    catch (error) {
+        if (error instanceof zod_1.z.ZodError) {
+            res.status(400).json({ errors: error.errors });
+        }
+        else {
+            res.status(500).json({ message: 'Server error' });
+        }
+    }
+};
+exports.resetPassword = resetPassword;
 // ─────────────────────────────────────────────────────────────────
 // Logout (invalidate refresh token)
 // ─────────────────────────────────────────────────────────────────

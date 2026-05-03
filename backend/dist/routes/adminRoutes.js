@@ -1,0 +1,24 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authMiddleware_1 = require("../middlewares/authMiddleware");
+const adminController_1 = require("../controllers/adminController");
+const router = (0, express_1.Router)();
+// All admin routes are protected and restricted to ADMIN role
+router.use(authMiddleware_1.protect);
+router.use((0, authMiddleware_1.authorize)('ADMIN'));
+router.get('/users', adminController_1.getAllUsers);
+router.patch('/users/:userId/status', adminController_1.updateUserStatus);
+router.get('/instructors', adminController_1.getAllInstructors);
+router.get('/instructors/applications', adminController_1.getInstructorApplications);
+router.post('/instructors/:profileId/approve', adminController_1.approveInstructor);
+router.get('/courses', adminController_1.getAllCourses);
+router.patch('/courses/:courseId/status', adminController_1.updateCourseStatus);
+router.get('/transactions', adminController_1.getTransactions);
+router.get('/enrollments', adminController_1.getEnrollments);
+router.post('/notifications/broadcast', adminController_1.broadcastNotification);
+router.post('/moderation', adminController_1.moderateContent);
+router.get('/financials', adminController_1.getDashboardFinancials);
+router.get('/stats', adminController_1.getSystemStats);
+router.get('/performance', adminController_1.getServerPerformance);
+exports.default = router;

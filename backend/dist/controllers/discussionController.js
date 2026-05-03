@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteReply = exports.moderateThread = exports.toggleReaction = exports.addReply = exports.getThreadDetails = exports.createThread = exports.getCourseDiscussions = void 0;
+exports.deleteReply = exports.moderateThread = exports.toggleReaction = exports.addReply = exports.getThreadReplies = exports.getThreadDetails = exports.createDiscussionThread = exports.getCourseDiscussions = void 0;
 const prisma_1 = require("../utils/prisma");
 const socket_1 = require("../socket");
 const getCourseDiscussions = async (req, res) => {
@@ -36,7 +36,7 @@ const getCourseDiscussions = async (req, res) => {
     }
 };
 exports.getCourseDiscussions = getCourseDiscussions;
-const createThread = async (req, res) => {
+const createDiscussionThread = async (req, res) => {
     try {
         const courseId = String(req.params.courseId);
         const { title, content } = req.body;
@@ -67,7 +67,7 @@ const createThread = async (req, res) => {
         res.status(500).json({ error: "Failed to create discussion thread" });
     }
 };
-exports.createThread = createThread;
+exports.createDiscussionThread = createDiscussionThread;
 const getThreadDetails = async (req, res) => {
     try {
         const threadId = String(req.params.threadId);
@@ -104,6 +104,32 @@ const getThreadDetails = async (req, res) => {
     }
 };
 exports.getThreadDetails = getThreadDetails;
+const getThreadReplies = async (req, res) => {
+    try {
+        const threadId = String(req.params.threadId);
+        const replies = await prisma_1.prisma.discussionReply.findMany({
+            where: { threadId, isDeleted: false, parentId: null },
+            include: {
+                author: { select: { id: true, name: true, avatar: true, role: true } },
+                reactions: { select: { userId: true, type: true } },
+                children: {
+                    where: { isDeleted: false },
+                    include: {
+                        author: { select: { id: true, name: true, avatar: true, role: true } },
+                    },
+                    orderBy: { createdAt: 'asc' }
+                }
+            },
+            orderBy: { createdAt: 'asc' }
+        });
+        res.status(200).json(replies);
+    }
+    catch (error) {
+        console.error("Fetch replies error:", error);
+        res.status(500).json({ error: "Failed to fetch thread replies" });
+    }
+};
+exports.getThreadReplies = getThreadReplies;
 const addReply = async (req, res) => {
     try {
         const threadId = String(req.params.threadId);

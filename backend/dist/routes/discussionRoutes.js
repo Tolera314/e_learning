@@ -18,7 +18,7 @@ const postLimiter = (0, express_rate_limit_1.default)({
 router.use(authMiddleware_1.protect);
 // Shared Routes (Student & Instructor)
 router.get('/courses/:courseId/discussions', discussionController_1.getCourseDiscussions);
-router.post('/courses/:courseId/discussions', postLimiter, discussionController_1.createThread);
+router.post('/courses/:courseId/discussions', postLimiter, discussionController_1.createDiscussionThread);
 router.get('/discussions/:threadId', discussionController_1.getThreadDetails);
 router.post('/discussions/:threadId/replies', postLimiter, discussionController_1.addReply);
 router.post('/discussions/:threadId/react', discussionController_1.toggleReaction);

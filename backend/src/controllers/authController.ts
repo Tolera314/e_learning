@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { generateToken, generateRefreshToken, hashRefreshToken } from '../utils/jwt';
 import { sendOTPEmail } from '../utils/mail';
+import { emailQueue } from '../queues/emailQueue';
+import logger from '../utils/logger';
 
 // Validation Schemas
 const registerSchema = z.object({
@@ -17,6 +19,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   identifier: z.string(), // email or phone
   password: z.string(),
+  rememberMe: z.boolean().optional(),
 });
 
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -60,19 +63,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     });
 
-    // Send OTP via Email if provided
+    // Send OTP via Email if provided (Queueing job)
     if (data.email) {
-      console.log(`[DEBUG] Attempting to send OTP email to: ${data.email}`);
-      const mailResult = await sendOTPEmail(data.email, otp, data.name);
-      if (mailResult.success) {
-        console.log(`[DEBUG] OTP email sent successfully to ${data.email}`);
-      } else {
-        console.warn(`[DEBUG] Failed to send OTP email to ${data.email}. Check Resend API key.`);
-      }
+      await emailQueue.add(`otp-${user.id}`, {
+        email: data.email,
+        otp: otp,
+        name: data.name
+      }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 }
+      });
     }
 
-    // Audit log — OTP is intentionally NOT logged in production
-    console.log(`[AUTH] New registration: ${data.name} | ${data.phoneNumber} | ${expires.toISOString()}`);
+    // Structured Audit Log
+    logger.info({ 
+      userId: user.id, 
+      role: user.role, 
+      event: 'user_registered' 
+    }, 'New user registered');
 
     res.status(201).json({
       message: 'User registered successfully. Please verify OTP.',
@@ -133,7 +141,9 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         name: user.name,
         role: user.role,
-        isVerified: true
+        avatar: user.avatar,
+        isVerified: true,
+        onboardingCompleted: user.onboardingCompleted
       },
       token
     });
@@ -176,10 +186,14 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
     });
 
     if (user.email) {
-      await sendOTPEmail(user.email, otp, user.name);
+      await emailQueue.add(`resend-otp-${user.id}`, {
+        email: user.email,
+        otp: otp,
+        name: user.name
+      });
     }
 
-    console.log(`[AUTH] OTP resent for user: ${user.id}`);
+    logger.info({ userId: user.id }, 'OTP resent');
 
     res.json({ message: 'OTP resent successfully' });
   } catch (error) {
@@ -187,9 +201,16 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const completeOnboarding = async (req: Request, res: Response): Promise<void> => {
+export const completeOnboarding = async (req: any, res: Response): Promise<void> => {
   try {
-    const { userId, ...data } = req.body;
+    const userId = req.user?.id; // Use authenticated userId, not from body
+    const data = req.body;
+ 
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+ 
     const user = await prisma.user.findUnique({ 
       where: { id: userId },
       include: { studentProfile: true, instructorProfile: true }
@@ -197,6 +218,11 @@ export const completeOnboarding = async (req: Request, res: Response): Promise<v
 
     if (!user) {
       res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    if (user.onboardingCompleted) {
+      res.status(400).json({ message: 'Onboarding is already completed. This can only be done once.' });
       return;
     }
 
@@ -280,7 +306,7 @@ export const completeOnboarding = async (req: Request, res: Response): Promise<v
         data: { trialUsed: true }
       });
 
-      console.log(`[SUBSCRIPTION] 3-Day Trial provisioned for user ${userId}`);
+      logger.info({ userId, event: 'trial_provisioned' }, '3-Day Trial provisioned');
     }
 
     res.json({ message: 'Onboarding completed successfully' });
@@ -316,16 +342,31 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = generateToken(user.id, user.role);
+    let refreshToken: string | undefined;
+
+    if (data.rememberMe) {
+      refreshToken = generateRefreshToken();
+      const hashed = hashRefreshToken(refreshToken);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          refreshToken: hashed,
+          refreshTokenExpires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      });
+    }
 
     res.json({
       user: {
         id: user.id,
         name: user.name,
         role: user.role,
+        avatar: user.avatar,
         isVerified: user.isVerified,
         onboardingCompleted: user.onboardingCompleted
       },
-      token
+      token,
+      refreshToken
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -373,6 +414,99 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error refreshing token' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// Forgot Password & Reset Password
+// ─────────────────────────────────────────────────────────────────
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = forgotPasswordSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Don't leak whether user exists or not
+      res.json({ message: 'If an account with that email exists, we have sent a reset link.' });
+      return;
+    }
+
+    const crypto = await import('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashed = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: hashed,
+        resetTokenExpires: expires
+      }
+    });
+
+    await emailQueue.add(`reset-${user.id}`, {
+      email: user.email!,
+      otp: resetToken, 
+      name: user.name,
+      isPasswordReset: true
+    });
+
+    res.json({ message: 'If an account with that email exists, we have sent a reset link.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ errors: error.errors });
+    } else {
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+};
+
+const resetPasswordSchema = z.object({
+  token: z.string(),
+  newPassword: z.string().min(6),
+});
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, newPassword } = resetPasswordSchema.parse(req.body);
+    const crypto = await import('crypto');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: hashedToken,
+        resetTokenExpires: { gt: new Date() }
+      }
+    });
+
+    if (!user) {
+      res.status(400).json({ message: 'Invalid or expired reset token' });
+      return;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashedPassword,
+        resetToken: null,
+        resetTokenExpires: null
+      }
+    });
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ errors: error.errors });
+    } else {
+      res.status(500).json({ message: 'Server error' });
+    }
   }
 };
 
