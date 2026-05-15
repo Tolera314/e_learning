@@ -124,16 +124,22 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const accessToken = generateToken(user.id, user.role);
+    // Always issue a refresh token on successful verification so the 15m access token
+    // can be silently renewed without forcing the user to log in again.
+    const rawRefreshToken = generateRefreshToken();
+    const hashedRefreshToken = hashRefreshToken(rawRefreshToken);
+
     await prisma.user.update({
       where: { id: userId },
       data: {
         isVerified: true,
         verificationCode: null,
-        verificationExpires: null
+        verificationExpires: null,
+        refreshToken: hashedRefreshToken,
+        refreshTokenExpires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
       }
     });
-
-    const token = generateToken(user.id, user.role);
 
     res.json({
       message: 'Email/Phone verified successfully',
@@ -145,7 +151,8 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
         isVerified: true,
         onboardingCompleted: user.onboardingCompleted
       },
-      token
+      token: accessToken,
+      refreshToken: rawRefreshToken
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -341,20 +348,33 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = generateToken(user.id, user.role);
-    let refreshToken: string | undefined;
-
-    if (data.rememberMe) {
-      refreshToken = generateRefreshToken();
-      const hashed = hashRefreshToken(refreshToken);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          refreshToken: hashed,
-          refreshTokenExpires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        }
-      });
+    // Check for banned/inactive accounts before issuing tokens
+    if ((user as any).isBanned) {
+      res.status(403).json({ message: 'Your account has been suspended. Contact support.' });
+      return;
     }
+
+    const accessToken = generateToken(user.id, user.role);
+
+    // Always issue a refresh token. rememberMe controls the lifetime:
+    //   rememberMe=true  → 30-day refresh token (persistent session)
+    //   rememberMe=false → 1-day refresh token (browser session)
+    const refreshTokenTTL = data.rememberMe
+      ? 30 * 24 * 60 * 60 * 1000   // 30 days
+      : 1 * 24 * 60 * 60 * 1000;   // 1 day
+
+    const rawRefreshToken = generateRefreshToken();
+    const hashedRefreshToken = hashRefreshToken(rawRefreshToken);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: hashedRefreshToken,
+        refreshTokenExpires: new Date(Date.now() + refreshTokenTTL)
+      }
+    });
+
+    logger.info({ userId: user.id, role: user.role, event: 'user_login' }, 'User logged in');
 
     res.json({
       user: {
@@ -365,8 +385,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         isVerified: user.isVerified,
         onboardingCompleted: user.onboardingCompleted
       },
-      token,
-      refreshToken
+      token: accessToken,
+      refreshToken: rawRefreshToken
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

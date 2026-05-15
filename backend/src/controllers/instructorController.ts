@@ -528,12 +528,22 @@ export const getMonetizationStats = async (req: AuthRequest, res: Response) => {
     const watchHours = ((profile as any).totalWatchMinutes || 0) / 60;
     const followerCount = (profile as any).followerCount || 0;
 
+    // HIGH-06: Fetch real student count and live session count
+    const [totalStudents, liveSessionsCount] = await Promise.all([
+      (prisma as any).enrollment.count({
+        where: { course: { instructorId: userId } }
+      }),
+      (prisma as any).liveSession.count({
+        where: { lesson: { module: { course: { instructorId: userId } } }, startTime: { gte: new Date() } }
+      })
+    ]);
+
     res.status(200).json({
       metrics: {
         followers: followerCount,
         watchHours: watchHours.toFixed(1),
-        totalStudents: 1250, // Mock for now
-        liveSessionsCount: 12
+        totalStudents,
+        liveSessionsCount
       },
       thresholds: MONETIZATION_THRESHOLDS,
       progress: {
@@ -730,18 +740,36 @@ export const getInstructorStudents = async (req: AuthRequest, res: Response) => 
       orderBy: { createdAt: 'desc' }
     });
 
-    const students = enrollments.map((e: any) => {
+    const students = await Promise.all(enrollments.map(async (e: any) => {
       const student = e.student;
+      
+      // HIGH-05: Real Milestone Generation
+      const completedLessons = await prisma.lessonProgress.count({
+        where: { studentId: student.id, isCompleted: true, lesson: { module: { courseId: e.courseId } } }
+      });
+      
+      const quizzesDone = await (prisma as any).quizSubmission.count({
+        where: { studentId: student.id, quiz: { lesson: { module: { courseId: e.courseId } } } }
+      });
+
+      const milestones = [];
+      if (completedLessons > 0) milestones.push(`Completed ${completedLessons} lessons`);
+      if (quizzesDone > 0) milestones.push(`Passed ${quizzesDone} quizzes`);
+      if (e.progressPercent >= 100) milestones.push("Course Certified");
+
       return {
         id: student.id,
         name: student.name,
         email: student.email,
         course: e.course.title,
         progress: Math.round(Number(e.progressPercent || 0)),
-        lastActive: "Active",
-        avatar: student.avatar
+        lastActive: e.updatedAt,
+        avatar: student.avatar,
+        milestones: milestones.length > 0 ? milestones : ["Started learning"],
+        quizzesDone,
+        videosWatched: completedLessons // Approximation
       };
-    });
+    }));
 
     res.status(200).json(students);
   } catch (error) {

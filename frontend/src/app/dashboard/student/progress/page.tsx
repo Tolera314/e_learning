@@ -7,6 +7,7 @@ import {
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
+import { toast } from "react-hot-toast";
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, 
   PolarRadiusAxis, ResponsiveContainer 
@@ -51,11 +52,17 @@ export default function StudentProgress() {
   const [claiming, setClaiming] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get("/student/progress")
+    setLoading(true);
+    const tfMap: Record<string, string> = { "7 Days": "7d", "30 Days": "30d", "3 Months": "3m" };
+    
+    api.get(`/student/progress?timeframe=${tfMap[timeframe]}`)
       .then(res => setData(res.data))
-      .catch(console.error)
+      .catch(err => {
+        console.error(err);
+        toast.error("Failed to load progress insights");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [timeframe]);
 
   const handleClaimCertificate = async (courseId: string, courseName: string) => {
     setClaiming(courseId);
@@ -68,13 +75,15 @@ export default function StudentProgress() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        toast.success("Certificate downloaded successfully!");
       }
     } catch (err) {
-      alert("Failed to claim certificate. Ensure you have 100% completion.");
+      toast.error("Failed to claim certificate. Ensure you have 100% completion.");
     } finally {
       setClaiming(null);
     }
   };
+
 
   const stats = [
     { label: "Overall Progress", value: `${data?.overallProgress ?? 0}%`, icon: Target, color: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600" },

@@ -13,13 +13,16 @@ import {
   Star
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import SlidePanel from "@/components/SlidePanel";
 import api from "@/lib/api";
+import { toast } from "react-hot-toast";
+import SlidePanel from "@/components/SlidePanel";
 
 
 
 export default function StudentManagement() {
   const [students, setStudents] = useState<any[]>([]);
+  const [courses, setCourses] = useState<string[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string>("All");
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [search, setSearch] = useState("");
@@ -33,27 +36,32 @@ export default function StudentManagement() {
       setLoading(true);
       const { data } = await api.get("/instructor/students");
       setStudents(data);
+      const uniqueCourses = Array.from(new Set(data.map((s: any) => s.course))) as string[];
+      setCourses(uniqueCourses);
     } catch (err) {
       console.error("Failed to fetch students", err);
+      toast.error("Failed to sync student data");
     } finally {
       setLoading(false);
     }
   };
 
-  const filtered = students.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.course.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = students.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
+                         s.course.toLowerCase().includes(search.toLowerCase());
+    const matchesCourse = selectedCourse === "All" || s.course === selectedCourse;
+    return matchesSearch && matchesCourse;
+  });
 
   return (
     <div className="max-w-7xl mx-auto">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Students</h1>
-          <p className="text-gray-500 mt-2">Track progress, view activity, and engage with your learners.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Learner Insights</h1>
+          <p className="text-gray-500 mt-2">Track real-time progress and academic milestones across your student base.</p>
         </div>
         <div className="flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-xl">
-          <TrendingUp size={16} /> {students.length} Total Students
+          <TrendingUp size={16} /> {students.length} Active Learners
         </div>
       </header>
 
@@ -65,13 +73,21 @@ export default function StudentManagement() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or course..."
+            placeholder="Search by student name..."
             className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-gray-900 dark:text-white"
           />
         </div>
-        <button className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-50 transition-colors">
-          <Filter size={18} /> Filter by Course
-        </button>
+        <div className="relative group">
+          <select 
+            value={selectedCourse}
+            onChange={(e) => setSelectedCourse(e.target.value)}
+            className="appearance-none px-10 py-3.5 bg-white dark:bg-[#111] border border-gray-100 dark:border-gray-800 rounded-2xl text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-50 transition-colors outline-none cursor-pointer"
+          >
+            <option value="All">All Courses</option>
+            {courses.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+        </div>
       </div>
 
       {/* STUDENT TABLE */}
@@ -83,9 +99,9 @@ export default function StudentManagement() {
                 <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Student</th>
                 <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Enrolled Course</th>
                 <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Progress</th>
-                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Avg. Score</th>
-                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Last Active</th>
-                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400 text-right">Details</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Quizzes</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400">Last Engagement</th>
+                <th className="px-8 py-5 text-xs font-bold uppercase tracking-widest text-gray-400 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -119,21 +135,20 @@ export default function StudentManagement() {
                     </div>
                   </td>
                   <td className="px-8 py-6">
-                    <span className="text-sm font-bold text-emerald-600">{student.quizAvg}</span>
+                    <span className="text-sm font-bold text-emerald-600">{student.quizzesDone} Done</span>
                   </td>
                   <td className="px-8 py-6">
-                    <span className="text-xs font-medium text-gray-500">{student.lastActive}</span>
+                    <span className="text-xs font-medium text-gray-500">
+                      {new Date(student.lastActive).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Message">
-                        <MessageSquare size={18} />
-                      </button>
                       <button
                         onClick={() => setSelectedStudent(student)}
                         className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-colors"
                       >
-                        Details <ChevronRight size={14} />
+                        Deep Dive <ChevronRight size={14} />
                       </button>
                     </div>
                   </td>
@@ -143,7 +158,7 @@ export default function StudentManagement() {
           </table>
         </div>
         {filtered.length === 0 && (
-          <div className="p-10 text-center text-gray-400">No students matching your search.</div>
+          <div className="p-10 text-center text-gray-400">No students matching your selection.</div>
         )}
       </div>
 
@@ -156,7 +171,6 @@ export default function StudentManagement() {
       >
         {selectedStudent && (
           <div className="space-y-8">
-            {/* Avatar & Course Chip */}
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 text-2xl font-black overflow-hidden">
                 {selectedStudent.avatar ? <img src={selectedStudent.avatar} alt="" className="w-full h-full object-cover" /> : selectedStudent.name[0]}
@@ -167,10 +181,9 @@ export default function StudentManagement() {
               </div>
             </div>
 
-            {/* Progress Bar */}
             <div className="p-5 bg-gray-50 dark:bg-gray-800/30 rounded-2xl">
               <div className="flex justify-between text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
-                <span>Overall Progress</span>
+                <span>Overall Course Progress</span>
                 <span className="text-emerald-600">{selectedStudent.progress}%</span>
               </div>
               <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full">
@@ -178,12 +191,11 @@ export default function StudentManagement() {
               </div>
             </div>
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-3 gap-4">
               {[
                 { label: "Videos Watched", value: selectedStudent.videosWatched || 0, icon: Video },
                 { label: "Quizzes Done", value: selectedStudent.quizzesDone || 0, icon: HelpCircle },
-                { label: "Avg Score", value: selectedStudent.quizAvg || "N/A", icon: Star }
+                { label: "Last Active", value: new Date(selectedStudent.lastActive).getDate() + " " + new Date(selectedStudent.lastActive).toLocaleString('default', { month: 'short' }), icon: Star }
               ].map((stat, i) => {
                 const Icon = stat.icon;
                 return (
@@ -196,12 +208,11 @@ export default function StudentManagement() {
               })}
             </div>
 
-            {/* Milestones */}
             <div>
-              <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">Completion Milestones</h4>
+              <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">Academic Milestones</h4>
               <div className="space-y-3">
-                {["Completed Introduction Module", "Passed Week 1 Quiz", "Submitted First Assignment"].map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                {(selectedStudent.milestones || []).map((m: string, i: number) => (
+                  <div key={i} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400 p-4 bg-gray-50 dark:bg-gray-800/20 rounded-xl">
                     <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                     {m}
                   </div>
@@ -210,7 +221,7 @@ export default function StudentManagement() {
             </div>
 
             <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-              <MessageSquare size={18} /> Send Message to {selectedStudent.name.split(" ")[0]}
+              <MessageSquare size={18} /> Send Guidance Message
             </button>
           </div>
         )}
@@ -224,3 +235,5 @@ export default function StudentManagement() {
     </div>
   );
 }
+
+

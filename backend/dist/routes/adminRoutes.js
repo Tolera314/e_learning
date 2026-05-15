@@ -19,6 +19,8 @@ router.get('/enrollments', adminController_1.getEnrollments);
 router.post('/notifications/broadcast', adminController_1.broadcastNotification);
 router.post('/moderation', adminController_1.moderateContent);
 router.get('/financials', adminController_1.getDashboardFinancials);
+router.get('/commissions', adminController_1.getCommissionStats);
+router.post('/commissions/rate', adminController_1.updateCommissionRate);
 router.get('/stats', adminController_1.getSystemStats);
 router.get('/performance', adminController_1.getServerPerformance);
 exports.default = router;

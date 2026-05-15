@@ -140,6 +140,19 @@ const submitQuiz = async (req, res) => {
         });
         if (!quiz)
             return res.status(404).json({ error: 'Quiz not found' });
+        // HIGH-01: Block re-submission brute-force — one attempt per student per quiz
+        const existingSubmission = await prisma_1.prisma.quizSubmission.findFirst({
+            where: { quizId: id, studentId },
+            select: { id: true, score: true, createdAt: true }
+        });
+        if (existingSubmission) {
+            return res.status(409).json({
+                error: 'You have already submitted this quiz.',
+                code: 'QUIZ_ALREADY_SUBMITTED',
+                previousScore: existingSubmission.score,
+                submittedAt: existingSubmission.createdAt,
+            });
+        }
         let score = 0;
         const detailedResults = [];
         const answerRecords = [];
@@ -232,6 +245,27 @@ exports.submitQuiz = submitQuiz;
 const getQuizSubmissions = async (req, res) => {
     try {
         const id = req.params.id;
+        const instructorId = req.user?.id;
+        // HIGH-02: Verify this quiz belongs to a course owned by the requesting instructor
+        const quiz = await prisma_1.prisma.quiz.findUnique({
+            where: { id },
+            include: {
+                lesson: {
+                    include: {
+                        module: {
+                            include: {
+                                course: { select: { instructorId: true, title: true } }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        if (!quiz)
+            return res.status(404).json({ error: 'Quiz not found' });
+        if (quiz.lesson.module.course.instructorId !== instructorId) {
+            return res.status(403).json({ error: 'You do not have permission to view submissions for this quiz.' });
+        }
         const submissions = await prisma_1.prisma.quizSubmission.findMany({
             where: { quizId: id },
             include: {

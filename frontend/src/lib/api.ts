@@ -21,30 +21,46 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor for API calls
+// Response interceptor — silently renews the access token on 401
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
             try {
                 const refreshToken = localStorage.getItem('refreshToken');
-                const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/refresh`, {
-                    refreshToken,
-                });
-                const { token } = response.data;
-                localStorage.setItem('token', token);
-                originalRequest.headers.Authorization = `Bearer ${token}`;
+                if (!refreshToken) throw new Error('No refresh token available');
+
+                const { data } = await axios.post(
+                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/refresh`,
+                    { refreshToken }
+                );
+
+                // Persist both the new access token AND the rotated refresh token.
+                // The backend invalidates the old refresh token on use — failing to store
+                // the new one means the next silent refresh will always fail.
+                localStorage.setItem('token', data.token);
+                if (data.refreshToken) {
+                    localStorage.setItem('refreshToken', data.refreshToken);
+                }
+
+                // Sync the new access token into the Authorization header and retry
+                originalRequest.headers.Authorization = `Bearer ${data.token}`;
                 return axios(originalRequest);
-            } catch (err) {
-                // Refresh token expired or invalid
+            } catch (refreshError) {
+                // Refresh token expired / invalid — log out cleanly via event
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
-                window.location.href = '/login';
-                return Promise.reject(err);
+                // Dispatch event so AuthContext / Zustand can clear state before redirect
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('auth:logout'));
+                }
+                return Promise.reject(refreshError);
             }
         }
+
         
         // Dispatch custom global event for unhandled server / network errors
         if (typeof window !== "undefined") {

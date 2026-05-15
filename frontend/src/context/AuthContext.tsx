@@ -70,7 +70,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     handleHydration();
-  }, [logout]);
+
+    // Listen for forced logout triggered by the API interceptor when the
+    // refresh token expires. This ensures React state is cleaned up before redirect.
+    const handleForcedLogout = () => {
+      setUser(null);
+      setToken(null);
+      router.push("/login");
+    };
+    window.addEventListener("auth:logout", handleForcedLogout);
+
+    return () => {
+      window.removeEventListener("auth:logout", handleForcedLogout);
+    };
+  }, [logout, router]);
+
 
   const login = (newToken: string, newRefreshToken: string, newUser: User) => {
     localStorage.setItem("token", newToken);

@@ -113,15 +113,21 @@ const verifyOTP = async (req, res) => {
             res.status(401).json({ message: 'Invalid or expired OTP' });
             return;
         }
+        const accessToken = (0, jwt_1.generateToken)(user.id, user.role);
+        // Always issue a refresh token on successful verification so the 15m access token
+        // can be silently renewed without forcing the user to log in again.
+        const rawRefreshToken = (0, jwt_1.generateRefreshToken)();
+        const hashedRefreshToken = (0, jwt_1.hashRefreshToken)(rawRefreshToken);
         await prisma_1.prisma.user.update({
             where: { id: userId },
             data: {
                 isVerified: true,
                 verificationCode: null,
-                verificationExpires: null
+                verificationExpires: null,
+                refreshToken: hashedRefreshToken,
+                refreshTokenExpires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
             }
         });
-        const token = (0, jwt_1.generateToken)(user.id, user.role);
         res.json({
             message: 'Email/Phone verified successfully',
             user: {
@@ -132,7 +138,8 @@ const verifyOTP = async (req, res) => {
                 isVerified: true,
                 onboardingCompleted: user.onboardingCompleted
             },
-            token
+            token: accessToken,
+            refreshToken: rawRefreshToken
         });
     }
     catch (error) {
@@ -309,19 +316,28 @@ const login = async (req, res) => {
             res.status(401).json({ message: 'Invalid credentials' });
             return;
         }
-        const token = (0, jwt_1.generateToken)(user.id, user.role);
-        let refreshToken;
-        if (data.rememberMe) {
-            refreshToken = (0, jwt_1.generateRefreshToken)();
-            const hashed = (0, jwt_1.hashRefreshToken)(refreshToken);
-            await prisma_1.prisma.user.update({
-                where: { id: user.id },
-                data: {
-                    refreshToken: hashed,
-                    refreshTokenExpires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                }
-            });
+        // Check for banned/inactive accounts before issuing tokens
+        if (user.isBanned) {
+            res.status(403).json({ message: 'Your account has been suspended. Contact support.' });
+            return;
         }
+        const accessToken = (0, jwt_1.generateToken)(user.id, user.role);
+        // Always issue a refresh token. rememberMe controls the lifetime:
+        //   rememberMe=true  → 30-day refresh token (persistent session)
+        //   rememberMe=false → 1-day refresh token (browser session)
+        const refreshTokenTTL = data.rememberMe
+            ? 30 * 24 * 60 * 60 * 1000 // 30 days
+            : 1 * 24 * 60 * 60 * 1000; // 1 day
+        const rawRefreshToken = (0, jwt_1.generateRefreshToken)();
+        const hashedRefreshToken = (0, jwt_1.hashRefreshToken)(rawRefreshToken);
+        await prisma_1.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                refreshToken: hashedRefreshToken,
+                refreshTokenExpires: new Date(Date.now() + refreshTokenTTL)
+            }
+        });
+        logger_1.default.info({ userId: user.id, role: user.role, event: 'user_login' }, 'User logged in');
         res.json({
             user: {
                 id: user.id,
@@ -331,8 +347,8 @@ const login = async (req, res) => {
                 isVerified: user.isVerified,
                 onboardingCompleted: user.onboardingCompleted
             },
-            token,
-            refreshToken
+            token: accessToken,
+            refreshToken: rawRefreshToken
         });
     }
     catch (error) {

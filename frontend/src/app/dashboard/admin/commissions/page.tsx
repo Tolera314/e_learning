@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from "@/lib/api";
+import { toast } from "react-hot-toast";
 import { 
   BarChart3, 
   Search, 
@@ -15,14 +17,37 @@ import {
   Wallet
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { toast } from "react-hot-toast";
 
 export default function CommissionManagement() {
   const [globalRate, setGlobalRate] = useState(20);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const saveRate = () => {
-    toast.success("Global commission rate updated to " + globalRate + "%");
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const { data } = await api.get("/admin/commissions");
+      setStats(data);
+      setGlobalRate(data.globalRate);
+    } catch (err) {
+      toast.error("Failed to fetch commission economics");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const saveRate = async () => {
+    try {
+      await api.post("/admin/commissions/rate", { rate: globalRate });
+      toast.success("Global commission rate updated to " + globalRate + "%");
+    } catch (err) {
+      toast.error("Failed to update commission rate");
+    }
+  };
+
 
   return (
     <div className="space-y-8 pb-20">
@@ -84,7 +109,7 @@ export default function CommissionManagement() {
                 <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-3">Model Analysis</h4>
                 <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
                   A {globalRate}% commission on current platform volume would generate approximately 
-                  <span className="font-bold"> 1.2M ETB </span> in monthly operational revenue.
+                  <span className="font-bold"> {((stats?.totalVolume || 0) * (globalRate/100)).toLocaleString()} ETB </span> in monthly operational revenue.
                 </p>
               </div>
             </div>
@@ -100,11 +125,11 @@ export default function CommissionManagement() {
             </h3>
             
             <div className="space-y-4">
-              {[
+              {(stats?.tiers || [
                 { label: "Elite (5k+ Students)", rate: "12%", color: "emerald", desc: "Top tier instructors with massive reach." },
                 { label: "Pro (1k+ Students)", rate: "15%", color: "blue", desc: "Proven instructors with steady growth." },
                 { label: "Standard (New)", rate: "20%", color: "gray", desc: "Default rate for rising talent." }
-              ].map((tier, idx) => (
+              ]).map((tier: any, idx: number) => (
                 <div key={idx} className="flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-3xl transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-800">
                   <div>
                     <p className="font-bold text-gray-900 dark:text-white">{tier.label}</p>
@@ -128,11 +153,11 @@ export default function CommissionManagement() {
             <div className="space-y-6 relative z-10">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">Total Pending</p>
-                <p className="text-3xl font-black">428,500 ETB</p>
+                <p className="text-3xl font-black">{(stats?.pendingPayouts || 0).toLocaleString()} ETB</p>
               </div>
               <div className="pt-6 border-t border-white/10">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">Next Payout Date</p>
-                <p className="text-xl font-bold">April 01, 2026</p>
+                <p className="text-xl font-bold">{stats?.nextPayoutDate || "Loading..."}</p>
               </div>
               <button className="w-full py-4 bg-white text-emerald-600 rounded-2xl font-bold text-sm shadow-xl hover:bg-emerald-50 transition-all">
                 Handle Payouts
@@ -148,17 +173,25 @@ export default function CommissionManagement() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Monthly GMV</span>
                 <span className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                  +12.4% <ArrowUpRight size={14} className="text-emerald-500" />
+                  {(stats?.totalVolume || 0).toLocaleString()} ETB
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Avg. Instructor ROI</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">742 ETB/User</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Platform Fee Volume</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {((stats?.totalVolume || 0) * (globalRate/100)).toLocaleString()} ETB
+                </span>
               </div>
             </div>
           </div>
         </div>
       </div>
+      {loading && (
+        <div className="fixed inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
+        </div>
+      )}
     </div>
+
   );
 }

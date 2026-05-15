@@ -716,6 +716,17 @@ export const getStudentEnrolledCourses = async (req: any, res: Response) => {
 export const getStudentProgress = async (req: any, res: Response) => {
     try {
         const studentId = req.user.id;
+        const timeframe = req.query.timeframe || '7d';
+
+        // HIGH-07: Timeframe calculation
+        let dateFilter = new Date();
+        if (timeframe === '30d') {
+            dateFilter.setDate(dateFilter.getDate() - 30);
+        } else if (timeframe === '3m') {
+            dateFilter.setMonth(dateFilter.getMonth() - 3);
+        } else {
+            dateFilter.setDate(dateFilter.getDate() - 7); // Default 7d
+        }
 
         const [enrollments, allSubmissions, lessonProgressList, activityLogs] = await Promise.all([
             prisma.enrollment.findMany({
@@ -725,7 +736,7 @@ export const getStudentProgress = async (req: any, res: Response) => {
                 }
             }),
             (prisma as any).quizSubmission.findMany({ 
-              where: { studentId }, 
+              where: { studentId, createdAt: { gte: dateFilter } }, 
               include: { 
                 quiz: { 
                   include: { 
@@ -739,11 +750,14 @@ export const getStudentProgress = async (req: any, res: Response) => {
               },
               orderBy: { createdAt: 'desc' } 
             }),
-            (prisma as any).lessonProgress.findMany({ where: { studentId } }),
+            (prisma as any).lessonProgress.findMany({ 
+              where: { studentId, updatedAt: { gte: dateFilter } } 
+            }),
             (prisma as any).studentActivityLog.findMany({
-                where: { studentId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }
+                where: { studentId, createdAt: { gte: dateFilter } }
             }),
         ]);
+
 
         const totalLessons = lessonProgressList.length;
         const completedLessons = lessonProgressList.filter((l: any) => l.isCompleted).length;

@@ -183,19 +183,38 @@ export const getCourses = async (req: AuthRequest, res: Response) => {
 export const getCourse = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const authReq = req as any; // Cast for optional user
+        const userId = authReq.user?.id;
+        const userRole = authReq.user?.role;
+
         const course = await prisma.course.findUnique({
             where: { id: id as string },
             include: {
-                instructor: { select: { name: true, avatar: true, instructorProfile: true } },
+                instructor: { select: { id: true, name: true, avatar: true, instructorProfile: true } },
                 _count: { select: { enrollments: true, modules: true } }
             }
         });
 
         if (!course) return res.status(404).json({ message: 'Course not found' });
 
+        // MED-02: Visibility Gate
+        // If course is not published, only the instructor or an admin can view it
+        if (course.visibility !== 'PUBLISHED') {
+            const isOwner = userId && course.instructorId === userId;
+            const isAdmin = userRole === 'ADMIN';
+
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ 
+                    message: 'This course is currently private or in draft mode.',
+                    code: 'COURSE_NOT_PUBLISHED' 
+                });
+            }
+        }
+
         res.status(200).json(course);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching course', error });
+        console.error('getCourse error:', error);
+        res.status(500).json({ message: 'Error fetching course' });
     }
 };
 

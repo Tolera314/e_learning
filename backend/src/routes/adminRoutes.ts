@@ -14,7 +14,9 @@ import {
   broadcastNotification,
   moderateContent,
   getDashboardFinancials,
-  getServerPerformance
+  getServerPerformance,
+  getCommissionStats,
+  updateCommissionRate
 } from '../controllers/adminController';
 
 const router = Router();
@@ -35,6 +37,8 @@ router.get('/enrollments', getEnrollments);
 router.post('/notifications/broadcast', broadcastNotification);
 router.post('/moderation', moderateContent);
 router.get('/financials', getDashboardFinancials);
+router.get('/commissions', getCommissionStats);
+router.post('/commissions/rate', updateCommissionRate);
 router.get('/stats', getSystemStats);
 router.get('/performance', getServerPerformance);
 

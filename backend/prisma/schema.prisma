@@ -99,9 +99,31 @@ model User {
   wishlist       Wishlist[]
   liveReminders  LiveReminder[]
   pollResponses  PollResponse[]
+  adminAuditLogs AdminAuditLog[]           @relation("AdminAction")
+  payouts        Payout[]                  @relation("InstructorPayout")
 
   @@map("users")
 }
+
+model Payout {
+  id          String   @id @default(uuid())
+  instructorId String  @map("instructor_id")
+  amount      Decimal
+  currency    String   @default("ETB")
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  method      String?  // TELEBIRR, BANK_TRANSFER
+  reference   String?  @unique
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  instructor  User     @relation("InstructorPayout", fields: [instructorId], references: [id])
+
+  @@index([instructorId])
+  @@index([status])
+  @@map("payouts")
+}
+
 
 model SearchLog {
   id           String   @id @default(uuid())
@@ -936,3 +958,33 @@ model PollResponse {
   @@unique([userId, pollId])
   @@map("poll_responses")
 }
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String   @map("admin_id")
+  action     String   // UPDATE_COMMISSION, BAN_USER, UNBAN_USER, DELETE_COURSE_ADMIN, CHANGE_ROLE
+  targetId   String?  @map("target_id")
+  targetType String?  @map("target_type") // USER, COURSE, SETTING
+  details    String?  @db.Text // JSON with before/after state
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User @relation("AdminAction", fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+model GlobalConfiguration {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String @db.Text
+  
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("global_configurations")
+}
+
